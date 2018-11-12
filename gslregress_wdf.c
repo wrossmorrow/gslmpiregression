@@ -101,15 +101,15 @@ void subproblem_objective_only( const double * x , gls_ols_params * p )
 	int i , k;
 
 	// compute the residuals from the data and coefficients
-	p->b[p->Ncols] = 0.0;
+	p->b[p->Nvars] = 0.0;
 	for( i = 0 ; i < p->Ncols ; i++ ) { 
 		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
 		for( k = 0 ; k < p->Nfeat ; k++ ) { 
 			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * x[ k ]; // accumulate dot product into the residual
 		}
-		p->b[p->Ncols] += p->r[i] * p->r[i]; // accumulate sum-of-squares in the buffer
+		p->b[p->Nvars] += p->r[i] * p->r[i]; // accumulate sum-of-squares in the buffer
 	}
-	p->b[p->Ncols] /= 2.0; // absorb typical factor-of-two normalization in OLS
+	p->b[p->Nvars] /= 2.0; // absorb typical factor-of-two normalization in OLS
 }
 
 void subproblem_gradient_only( const double * x , gls_ols_params * p )
@@ -127,16 +127,16 @@ void subproblem_gradient_only( const double * x , gls_ols_params * p )
 	// now, compute b[0:Nvars) <- [ D , 1 ]' r = [ D' ; 1' ] r where r = [ D , 1 ] x - y
 
 	// feature terms
-	for( i = 0 ; i < p->Nfeat ; i++ ) {
-		p->b[i] = 0.0;
-		for( k = 0 ; k < p->Ncols ; k++ ) { 
-			p->b[i] += p->data[ k*(p->Nvars) + i ] * p->r[k];
+	for( k = 0 ; k < p->Nfeat ; k++ ) {
+		(p->b)[k] = 0.0;
+		for( i = 0 ; i < p->Ncols ; i++ ) { 
+			(p->b)[k] += (p->data)[ i*(p->Nvars) + k ] * (p->r)[i];
 		}
 	}
 
 	// constant term
-	p->b[p->Nfeat] = 0.0; 
-	for( k = 0 ; k < p->Ncols ; k++ ) { p->b[p->Nfeat] += p->r[k]; }
+	(p->b)[p->Nfeat] = 0.0; 
+	for( i = 0 ; i < p->Ncols ; i++ ) { (p->b)[p->Nfeat] += (p->r)[i]; }
 
 }
 
@@ -144,16 +144,17 @@ void subproblem_objective_and_gradient( const double * x , gls_ols_params * p )
 {
 	int i , k;
 
-	// compute the residuals from the data and coefficients, accumulating objective
-	p->b[p->Ncols] = 0.0;
+	// compute the residuals from the data and coefficients, accumulating objective 
+	// buffer allocated to be length Nvars+1 for this
+	p->b[p->Nvars] = 0.0;
 	for( i = 0 ; i < p->Ncols ; i++ ) { 
 		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
 		for( k = 0 ; k < p->Nfeat ; k++ ) { 
 			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * x[ k ]; // accumulate dot product into the residual
 		}
-		p->b[p->Ncols] += p->r[i] * p->r[i]; // accumulate sum-of-squares
+		p->b[p->Nvars] += p->r[i] * p->r[i]; // accumulate sum-of-squares
 	}
-	p->b[p->Ncols] /= 2.0; // absorb typical factor-of-two normalization in OLS
+	p->b[p->Nvars] /= 2.0; // absorb typical factor-of-two normalization in OLS
 
 	// now, compute b[0:Nvars) <- [ D , 1 ]' r = [ D' ; 1' ] r where r = [ D , 1 ] x - y
 
@@ -215,7 +216,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 	subproblem_objective_only( x->data , p );
 
 	// reduction step
-	MPI_Reduce( (void*)( p->b + p->Ncols ) , &f , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
+	MPI_Reduce( (void*)( p->b + p->Nvars ) , &f , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
 
 	// normalization
 	f /= ((double)(p->Nobsv));
@@ -654,7 +655,7 @@ int main( int argc , char * argv[] )
 					// local evaluation, writes into params.b
 					subproblem_objective_only( params.x , &params );
 					// sum-reduce to accumulate parts back in the root process
-					MPI_Reduce( (void*)( params.b + params.Ncols ) , NULL , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
+					MPI_Reduce( (void*)( params.b + params.Nvars ) , NULL , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
 					break;
 				case 2 : // gradient only
 					// local evaluation, writes into params.b
