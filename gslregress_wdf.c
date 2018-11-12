@@ -603,18 +603,27 @@ int main( int argc , char * argv[] )
 					subproblem_objective_only( params.x , &params );
 					// sum-reduce to accumulate parts back in the root process
 					MPI_Reduce( (void*)( params.b + params.Ncols ) , NULL , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
+#ifdef _GSLREGRESS_VERBOSE
+					printf( "%0.6f: process %i: past reduction\n" , MPI_Wtime()-start , p );
+#endif
 					break;
 				case 2 : // gradient only
 					// local evaluation, writes into params.b
 					subproblem_gradient_only( params.x , &params );
 					// sum-reduce to accumulate parts back in the root process
 					MPI_Reduce( (void*)( params.b ) , NULL , params.Ncols , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
+#ifdef _GSLREGRESS_VERBOSE
+					printf( "%0.6f: process %i: past reduction\n" , MPI_Wtime()-start , p );
+#endif
 					break;
 				case 3 : // objective and gradient
 					// local evaluation, writes into params.b
 					subproblem_objective_and_gradient( params.x , &params );
 					// sum-reduce to accumulate parts back in the root process
 					MPI_Reduce( (void*)( params.b ) , NULL , params.Ncols + 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
+#ifdef _GSLREGRESS_VERBOSE
+					printf( "%0.6f: process %i: past reduction\n" , MPI_Wtime()-start , p );
+#endif
 					break;
 				default: 
 					printf( "%0.6f: process %i: unknown evaluation code: %i\n" , MPI_Wtime()-start , p , status );
