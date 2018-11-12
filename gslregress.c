@@ -102,24 +102,6 @@ void subproblem_objective( const double * x , gls_ols_params * p )
 	p->s /= 2.0; // absorb typical factor-of-two normalization in OLS
 }
 
-double non_distributed_objective( const gsl_vector * x , void * params )
-{
-	int i , k;
-	gls_ols_params * p = ( gls_ols_params * )params;
-
-	// compute the residuals from the data and coefficients
-	p->s = 0.0;
-	for( i = 0 ; i < p->Nobsv ; i++ ) { 
-		p->r[ i ] = gsl_vector_get( x , p->Nfeat ) - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
-		for( k = 0 ; k < p->Nfeat ; k++ ) { 
-			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
-		}
-		p->s += p->r[i] * p->r[i]; // accumulate sum-of-squares
-	}
-	p->s /= 2.0 * ((double)(p->Nobsv)) ; // absorb typical factor-of-two normalization in OLS
-	return p->s;
-}
-
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -132,6 +114,25 @@ double non_distributed_objective( const gsl_vector * x , void * params )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+double non_distributed_objective( const gsl_vector * x , void * params )
+{
+	int i , k;
+	double f;
+	gls_ols_params * p = ( gls_ols_params * )params;
+
+	// compute the residuals from the data and coefficients
+	f = 0.0;
+	for( i = 0 ; i < p->Nobsv ; i++ ) { 
+		p->r[ i ] = gsl_vector_get( x , p->Nfeat ) - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+		for( k = 0 ; k < p->Nfeat ; k++ ) { 
+			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
+		}
+		f += p->r[i] * p->r[i]; // accumulate sum-of-squares
+	}
+	f /= 2.0 * ((double)(p->Nobsv)) ; // absorb typical factor-of-two normalization in OLS
+	return f;
+}
 
 double distributed_objective( const gsl_vector * x , void * params )
 {
@@ -398,7 +399,7 @@ int main( int argc , char * argv[] )
 		gsl_ols( &params );
 
 		// do a "serial" minimization, exactly what we do below but without distributing the objective
-		gsl_minimize( &params , x0 );
+		// gsl_minimize( &params , x0 );
 
 		// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
