@@ -313,6 +313,8 @@ int main( int argc , char * argv[] )
 
 	double * coeffs;
 
+	double method_start;
+
 	// here we create a parameters structure for our use
 	gls_ols_params params;
 
@@ -409,13 +411,20 @@ int main( int argc , char * argv[] )
 		double * x0 = ( double * )malloc( params.Nvars * sizeof( double ) );
 		for( i = 0 ; i < params.Nvars ; i++ ) { x0[i] = 2.0 * urand() - 1.0; }
 
+
 		// do a "standard" regression with the GSL tools
 		gsl_ols( &params , NULL );
 
+		method_start = MPI_Wtime();
+		printf( "%0.6f: GSL Multimin Estimation...\n" , MPI_Wtime()-start );
 		// do a "serial" minimization, exactly what we do below but without distributing the objective
 		gsl_minimize( &params , x0 );
+		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime() - method_start );
 
 		// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
+
+		method_start = MPI_Wtime();
+		printf( "%0.6f: Distributed GSL Multimin Estimation... \n" , MPI_Wtime()-start );
 
 		// initial barrier, basically separating the data simulation from the solve attempt
 		MPI_Barrier( MPI_COMM_WORLD );
@@ -533,6 +542,8 @@ int main( int argc , char * argv[] )
 		gsl_vector_free( x );
 		gsl_vector_free( ss );
 		gsl_multimin_fminimizer_free( s );
+		
+		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime() - method_start );
 
 	} else {
 
