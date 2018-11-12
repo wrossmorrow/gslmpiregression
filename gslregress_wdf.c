@@ -585,12 +585,8 @@ int main( int argc , char * argv[] )
 #ifdef _GSLREGRESS_VERBOSE
 				printf( "%0.6f: process %i: exiting worker loop\n" , MPI_Wtime()-start , p );
 #endif
-				break; 
+				break;
 			}
-
-#ifdef _GSLREGRESS_VERBOSE
-			printf( "%0.6f: process %i: continuing\n" , MPI_Wtime()-start , p );
-#endif
 
 			// get variables
 			MPI_Bcast( (void*)(params.x) , params.Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
@@ -621,7 +617,7 @@ int main( int argc , char * argv[] )
 					MPI_Reduce( (void*)( params.b ) , NULL , params.Ncols + 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
 					break;
 				default: 
-					printf( "%0.6f: process %i: unknown evaluation code: %i\n" , MPI_Wtime()-start , p , evaluation );
+					printf( "%0.6f: process %i: unknown evaluation code: %i\n" , MPI_Wtime()-start , p , status );
 					break;
 			}
 
