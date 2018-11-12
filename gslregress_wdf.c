@@ -39,6 +39,9 @@
 // optimization tolerance
 #define GSLREGRESS_OPT_TOL 1.0e-4
 
+// initial step size
+#define GSLREGRESS_STEP_SIZE 1.0
+
 // maximum number of iterations
 #define GSLREGRESS_MAX_ITER 1000
 
@@ -460,10 +463,6 @@ int main( int argc , char * argv[] )
 		sos.fdf = &distributed_objective_and_gradient; // defined elsewhere
 		sos.params = (void*)(&params); // we'll pass the data object, allocated here, to objective evaluations
 
-		// step size
-		gsl_vector * ss = gsl_vector_alloc( params.Nvars );
-		gsl_vector_set_all( ss , 1.0 );
-
 		// initial point (random guess)
 		gsl_vector * x = gsl_vector_alloc( params.Nvars );
 		for( i = 0 ; i < params.Nvars ; i++ ) {
@@ -475,7 +474,7 @@ int main( int argc , char * argv[] )
 #endif
 
 		// "register" these with the minimizer
-		gsl_multimin_fdfminimizer_set( s , &sos , x , ss , GSLREGRESS_OPT_TOL );
+		gsl_multimin_fdfminimizer_set( s , &sos , x , GSLREGRESS_STEP_SIZE , GSLREGRESS_OPT_TOL );
 
 		// synchronize before starting iterations
 		// 
