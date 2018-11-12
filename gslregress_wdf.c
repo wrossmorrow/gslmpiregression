@@ -295,6 +295,10 @@ void distributed_objective_and_gradient( const gsl_vector * x , void * params , 
 	// send variables
 	MPI_Bcast( (void*)(x->data) , p->Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
 
+#ifdef _GSLREGRESS_VERBOSE
+	printf( "%0.6f: (global) past broadcasts\n" , MPI_Wtime()-start , p );
+#endif
+
 	// local evaluation
 	subproblem_objective_and_gradient( x->data , p );
 
