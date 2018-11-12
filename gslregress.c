@@ -197,7 +197,7 @@ void gsl_ols( gls_ols_params * params )
 			gsl_matrix_set( X , n , i , params->data[ n * params->Nvars + i ] );
 		}
 		gsl_matrix_set( X , n , params->Nfeat , 1.0 );
-		gsl_vector_set( y , n , params->data[ n * params->Nvars + params->Nfeat-1 ] );
+		gsl_vector_set( y , n , params->data[ n * params->Nvars + params->Nfeat ] );
 	}
 
 #ifdef _GSLREGRESS_VERBOSE
