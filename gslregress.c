@@ -288,7 +288,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 	gsl_multimin_fminimizer_free( s );
 
 	// ** HACK **
-	
+
 	free( params->r );
 	params->r = ( double * )malloc( params->Ncols * sizeof( double ) );
 	for( i = 0 ; i < params->Nobsv ; i++ ) { (params->r)[i] = 0.0; }
@@ -417,7 +417,7 @@ int main( int argc , char * argv[] )
 		gsl_ols( &params , NULL );
 
 		// do a "serial" minimization, exactly what we do below but without distributing the objective
-		// gsl_minimize( &params , x0 );
+		gsl_minimize( &params , x0 );
 
 		// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
