@@ -110,7 +110,7 @@ double non_distributed_objective( const gsl_vector * x , void * params )
 	// compute the residuals from the data and coefficients
 	p->s = 0.0;
 	for( i = 0 ; i < p->Nobsv ; i++ ) { 
-		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+		p->r[ i ] = gsl_vector_get( x , p->Nfeat ) - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
 		for( k = 0 ; k < p->Nfeat ; k++ ) { 
 			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
 		}
