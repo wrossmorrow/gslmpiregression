@@ -403,7 +403,7 @@ int main( int argc , char * argv[] )
 		for( i = 0 ; i < params.Nvars ; i++ ) { x0[i] = 2.0 * urand() - 1.0; }
 
 		// do a "standard" regression with the GSL tools
-		gsl_ols( &params );
+		gsl_ols( &params , NULL );
 
 		// do a "serial" minimization, exactly what we do below but without distributing the objective
 		// gsl_minimize( &params , x0 );
