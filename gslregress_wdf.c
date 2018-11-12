@@ -32,6 +32,7 @@
 
 #include <mpi.h>
 
+#include <gsl/gsl_multifit.h>
 #include <gsl/gsl_multimin.h>
 
 // comment out to suppress (most) messages, including data print
