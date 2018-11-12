@@ -35,7 +35,7 @@
 #include <gsl/gsl_multimin.h>
 
 // comment out to suppress (most) messages, including data print
-#define _GSLREGRESS_VERBOSE
+// #define _GSLREGRESS_VERBOSE
 
 // optimization tolerance
 #define GSLREGRESS_OPT_TOL 1.0e-4
@@ -288,12 +288,10 @@ int main( int argc , char * argv[] )
     	gsl_vector_free( y );
     	gsl_matrix_free( S );
 
-    	printf( "%0.6f: process %i: OLS estimates: %0.2f" , MPI_Wtime()-start , p , c->data[0] );
-		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , c->data[i*(c->stride)] ); }
+    	printf( "%0.6f: process %i: OLS estimates: %0.2f" , MPI_Wtime()-start , p , gsl_vector_get( c , 0 ) );
+		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , gsl_vector_get( c , i ) ); }
 		printf( "\n" );
     	gsl_vector_free( c );
-
-
 
 		// initial barrier, basically separating the data simulation from the solve attempt
 		MPI_Barrier( MPI_COMM_WORLD );
