@@ -35,7 +35,7 @@
 #include <gsl/gsl_multimin.h>
 
 // comment out to suppress (most) messages, including data print
-#define _GSLREGRESS_VERBOSE
+// #define _GSLREGRESS_VERBOSE
 
 // optimization tolerance
 #define GSLREGRESS_OPT_TOL 1.0e-4
@@ -183,7 +183,7 @@ double distributed_objective( const gsl_vector * x , void * params )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void gsl_ols( gls_ols_params * params ) 
+void gsl_ols( gls_ols_params * params , double * ols_c ) 
 {
 
 	int i , n;
@@ -200,16 +200,6 @@ void gsl_ols( gls_ols_params * params )
 		gsl_vector_set( y , n , params->data[ n * params->Nvars + params->Nfeat ] );
 	}
 
-#ifdef _GSLREGRESS_VERBOSE
-	for( n = 0 ; n < params->Nobsv ; n++ ) {
-		printf( "  %0.3f" , gsl_matrix_get( X , n , 0 ) );
-		for( i = 1 ; i < params->Nvars ; i++ ) {
-			printf( " , %0.3f" , gsl_matrix_get( X , n , i ) );
-		}
-		printf( " | %0.3f\n" , gsl_vector_get( y , n ) );
-	}
-#endif
-
 	gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( params->Nobsv , params->Nvars );
 	gsl_multifit_linear( X , y , c , S , &chisq , ols );
 	gsl_multifit_linear_free( ols );
@@ -217,8 +207,14 @@ void gsl_ols( gls_ols_params * params )
 	gsl_vector_free( y );
 	gsl_matrix_free( S );
 
-	printf( "%0.6f: GSL OLS estimates: %0.2f" , MPI_Wtime()-start , gsl_vector_get( c , 0 ) );
-	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.2f" , gsl_vector_get( c , i ) ); }
+	if( ols_c != NULL ) {
+		for( i = 0 ; i < params->Nvars ; i++ ) { 
+			ols_c[i] = gsl_vector_get( c , i );
+		}
+	}
+
+	printf( "%0.6f: GSL OLS estimates: %0.3f" , MPI_Wtime()-start , gsl_vector_get( c , 0 ) );
+	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.3f" , gsl_vector_get( c , i ) ); }
 	printf( "\n" );
 	gsl_vector_free( c );
 
@@ -511,11 +507,11 @@ int main( int argc , char * argv[] )
 #endif
 
 		// only non-verbose print
-		printf( "%0.6f: process %i: real coefficients: %0.2f" , MPI_Wtime()-start , p , coeffs[0] );
-		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , coeffs[i] ); }
+		printf( "%0.6f: process %i: real coefficients: %0.3f" , MPI_Wtime()-start , p , coeffs[0] );
+		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , coeffs[i] ); }
 		printf( "\n" );
-		printf( "%0.6f: process %i: estimated coeffs: %0.2f" , MPI_Wtime()-start , p , ((s->x)->data)[0] );
-		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , ((s->x)->data)[i] ); }
+		printf( "%0.6f: process %i: estimated coeffs: %0.3f" , MPI_Wtime()-start , p , ((s->x)->data)[0] );
+		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , ((s->x)->data)[i] ); }
 		printf( "\n" );
 
 		// ** IMPORTANT ** 
