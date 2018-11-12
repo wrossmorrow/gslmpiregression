@@ -621,6 +621,7 @@ int main( int argc , char * argv[] )
 					MPI_Reduce( (void*)( params.b ) , NULL , params.Ncols + 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
 					break;
 				default: 
+					printf( "%0.6f: process %i: unknown evaluation code: %i\n" , MPI_Wtime()-start , p , evaluation );
 					break;
 			}
 
