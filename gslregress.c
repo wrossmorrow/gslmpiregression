@@ -9,8 +9,8 @@
  * MPI. You can pass two (non-MPI) parameters to the executable: the number of observations N and the 
  * number of features K. Then the problem solved is 
  * 
- *     min 1/(2N) sum_{n=1}^N ( sum_{k=1}^K D(k,n) x(k) + x(K+1) - y(n) )^2
- *     wrt x(1),...,x(K+1)
+ * min 1/(2N) sum_{n=1}^N ( sum_{k=1}^K D(k,n) x(k) + x(K+1) - y(n) )^2
+ *wrt x(1),...,x(K+1)
  * 
  * That is, we minimize the (average, halved) sum-of-squares error of an affine (linear + constant) model 
  * of the data columns/outcome pairs (D(:,n),y(n)). 
@@ -32,7 +32,7 @@
 
 #include <gsl/gsl_multimin.h>
 
-// comment out to suppress messages
+// comment out to suppress (most) messages, including data print
 #define _GSLREGRESS_VERBOSE
 
 // optimization tolerance
@@ -251,12 +251,12 @@ int main( int argc , char * argv[] )
 #ifdef _GSLREGRESS_VERBOSE
     printf( "%0.6f: all data: \n" , MPI_Wtime()-start );
     for( n = 0 ; n < N ; n++ ) {
-    printf( "%0.6f:  column %i: %0.2f" , MPI_Wtime()-start , n , params.data[n*(K+1)+0] );
-    for( i = 1 ; i <= K ; i++ ) {
-    printf( ", %0.2f" , params.data[n*(K+1)+i] );
-  }
-    printf( "\n" );
-  }
+      printf( "%0.6f:  column %i: %0.2f" , MPI_Wtime()-start , n , params.data[n*(K+1)+0] );
+      for( i = 1 ; i <= K ; i++ ) {
+	printf( ", %0.2f" , params.data[n*(K+1)+i] );
+      }
+      printf( "\n" );
+    }
 #endif
 
     // initial barrier
@@ -271,14 +271,14 @@ int main( int argc , char * argv[] )
 
     // root process needs all counts
     for( i = 0 ; i < P ; i++ ) {
-    counts[i] = B + ( i < R ? 1 : 0 );
-    counts[i] *= K + 1; // multiply by regression size (K), plus one for the obseration (y)
-  }
+      counts[i] = B + ( i < R ? 1 : 0 );
+      counts[i] *= K + 1; // multiply by regression size (K), plus one for the obseration (y)
+    }
 
     offset[0] = 0;
     for( i = 1 ; i < P ; i++ ) {
-    offset[i] = offset[i-1] + counts[i-1];
-  }
+      offset[i] = offset[i-1] + counts[i-1];
+    }
 
     // sending-end scatterv, send from "data"
     MPI_Scatterv( (void*)(params.data) , counts , offset , MPI_DOUBLE , NULL , 0 , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
@@ -308,15 +308,20 @@ int main( int argc , char * argv[] )
     // initial point (random guess)
     gsl_vector * x = gsl_vector_alloc( params.Nvars );
     for( i = 0 ; i < params.Nvars ; i++ ) {
-    gsl_vector_set( x , i , 2.0 * urand() - 1.0 );
-  }
+      gsl_vector_set( x , i , 2.0 * urand() - 1.0 );
+    }
 
     printf( "%0.6f: process %i: registering problem\n" , MPI_Wtime()-start , p );
 
     // "register" these with the minimizer
     gsl_multimin_fminimizer_set( s , &sos , x , ss );
 
-    // synchronize before startingiterations
+    // synchronize before starting iterations
+    // 
+    // NOTE: This is a ** BAD ** idea. This deadlocks the code with GSL, at least. 
+    // When we "register" the function calls, GSL will call them (the objective at least). 
+    // If we expect to wait until iterations start with this synchronization, we deadlock. 
+    // 
     // MPI_Barrier( MPI_COMM_WORLD ); 
 
     printf( "%0.6f: process %i: starting iterations\n" , MPI_Wtime()-start , p );
@@ -327,18 +332,18 @@ int main( int argc , char * argv[] )
     double size;
     do {
 
-    // iterate will call the distributed objective
-    status = gsl_multimin_fminimizer_iterate( s );
-    iter++;
+      // iterate will call the distributed objective
+      status = gsl_multimin_fminimizer_iterate( s );
+      iter++;
 
-    printf( "%0.6f: process %i: iteration %i\n" , MPI_Wtime()-start , p , iter );
+      printf( "%0.6f: process %i: iteration %i\n" , MPI_Wtime()-start , p , iter );
 
-    if( status ) { break; } // iteration failure? 
+      if( status ) { break; } // iteration failure? 
 
-    size = gsl_multimin_fminimizer_size( s );
-    status = gsl_multimin_test_size( size , GSLREGRESS_OPT_TOL );
+      size = gsl_multimin_fminimizer_size( s );
+      status = gsl_multimin_test_size( size , GSLREGRESS_OPT_TOL );
 
-  } while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
+    } while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
 
     printf( "%0.6f: process %i: finished iterations\n" , MPI_Wtime()-start , p );
 
@@ -378,6 +383,11 @@ int main( int argc , char * argv[] )
     // do any local setup required with this data...
 
     // synchronize before starting iterations
+    // 
+    // NOTE: This is a ** BAD ** idea. This deadlocks the code with GSL, at least. 
+    // When we "register" the function calls, GSL will call them (the objective at least). 
+    // If we expect to wait until iterations start with this synchronization, we deadlock. 
+    // 
     // MPI_Barrier( MPI_COMM_WORLD );
 
     // entering iteration phase... 
