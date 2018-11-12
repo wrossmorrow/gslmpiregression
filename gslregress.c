@@ -124,11 +124,11 @@ double non_distributed_objective( const gsl_vector * x , void * params )
 	// compute the residuals from the data and coefficients
 	f = 0.0;
 	for( i = 0 ; i < p->Nobsv ; i++ ) { 
-		p->r[ i ] = gsl_vector_get( x , p->Nfeat ) - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+		(p->r)[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
 		for( k = 0 ; k < p->Nfeat ; k++ ) { 
-			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
+			(p->r)[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
 		}
-		f += p->r[i] * p->r[i]; // accumulate sum-of-squares
+		f += (p->r)[i] * (p->r)[i]; // accumulate sum-of-squares
 	}
 	f /= 2.0 * ((double)(p->Nobsv)) ; // absorb typical factor-of-two normalization in OLS
 	return f;
@@ -234,6 +234,11 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 {
 	int i;
 
+	// ** HACK ** 
+	free( params->r );
+	params->r = ( double * )malloc( params->Nobsv * sizeof( double ) );
+	for( i = 0 ; i < params->Nobsv ; i++ ) { (params->r)[i] = 0.0; }
+
 	// minimizer object
 	const gsl_multimin_fminimizer_type * T = gsl_multimin_fminimizer_nmsimplex2;
 	gsl_multimin_fminimizer * s = gsl_multimin_fminimizer_alloc( T , params->Nvars );
@@ -273,14 +278,20 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 	} while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
 
 	// print out result obtained
-	printf( "%0.6f: estimated coeffs: %0.2f" , MPI_Wtime()-start , gsl_vector_get( s->x , 0 ) );
-	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.2f" , gsl_vector_get( s->x , i ) ); }
+	printf( "%0.6f: estimated coeffs: %0.3f" , MPI_Wtime()-start , gsl_vector_get( s->x , 0 ) );
+	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.3f" , gsl_vector_get( s->x , i ) ); }
 	printf( "\n" );
 
 	// clean up after optimizer
 	gsl_vector_free( x );
 	gsl_vector_free( ss );
 	gsl_multimin_fminimizer_free( s );
+
+	// ** HACK **
+	
+	free( params->r );
+	params->r = ( double * )malloc( params->Ncols * sizeof( double ) );
+	for( i = 0 ; i < params->Nobsv ; i++ ) { (params->r)[i] = 0.0; }
 
 }
 
