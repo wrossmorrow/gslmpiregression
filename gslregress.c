@@ -178,7 +178,7 @@ void gsl_ols( gls_ols_params * params )
 			gsl_matrix_set( X , n , i , params->data[ n * params->Nvars + i ] );
 		}
 		gsl_matrix_set( X , n , params->Nfeat-1 , 1.0 );
-		gsl_vector_set( y , i , params->data[ n * params->Nvars + K ] );
+		gsl_vector_set( y , i , params->data[ n * params->Nvars + params->Nfeat-1 ] );
 	}
 	gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( N , params->Nvars );
 	gsl_multifit_linear( X , y , c , S , &chisq , ols );
@@ -214,7 +214,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 
 	// evaluation function
 	gsl_multimin_function sos;
-	sos.n = params.Nvars; // features and constant
+	sos.n = params->Nvars; // features and constant
 	sos.f = &non_distributed_objective; // defined elsewhere
 	sos.params = (void*)params; // we'll pass the data object, allocated here, to objective evaluations
 
@@ -224,7 +224,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 
 	// initial point (random guess)
 	gsl_vector * x = gsl_vector_alloc( params->Nvars );
-	for( i = 0 ; i < params->Nvars ; i++ ) { gsl_vector_set( x , i , x0 ); }
+	for( i = 0 ; i < params->Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
 
 	// "register" these with the minimizer
 	gsl_multimin_fminimizer_set( s , &sos , x , ss );
@@ -246,10 +246,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 
 	} while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
 
-	// only non-verbose print
-	printf( "%0.6f: real coefficients: %0.2f" , MPI_Wtime()-start , coeffs[0] );
-	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.2f" , coeffs[i] ); }
-	printf( "\n" );
+	// print out result obtained
 	printf( "%0.6f: estimated coeffs: %0.2f" , MPI_Wtime()-start , gsl_vector_get( s->x , 0 ) );
 	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.2f" , gsl_vector_get( s->x , i ) ); }
 	printf( "\n" );
@@ -385,6 +382,7 @@ int main( int argc , char * argv[] )
 		// do a "serial" minimization, exactly what we do below but without distributing the objective
 		gsl_minimize( &params , x0 );
 
+		// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
 		// initial barrier, basically separating the data simulation from the solve attempt
 		MPI_Barrier( MPI_COMM_WORLD );
