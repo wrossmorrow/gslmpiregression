@@ -194,7 +194,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 	int evaluate = 1; // code for this type of evaluation
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: evaluating %s at %0.6f" , MPI_Wtime()-start , EVAL_TYPE(1) , x->data[0] );
+	printf( "%0.6f: (global) evaluating %s at %0.6f" , MPI_Wtime()-start , EVAL_TYPE(1) , x->data[0] );
 	for( i = 1 ; i < p->Nvars ; i++ ) { printf( " , %0.6f" , x->data[i] ); }
 	printf( "\n" );
 #endif
@@ -216,6 +216,10 @@ double distributed_objective( const gsl_vector * x , void * params )
 	// reduction step
 	MPI_Reduce( (void*)( p->b + p->Ncols ) , &f , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
 
+#ifdef _GSLREGRESS_VERBOSE
+	printf( "%0.6f: (global) past reduction\n" , MPI_Wtime()-start , p );
+#endif
+
 	// normalization
 	f /= ((double)(p->Nobsv));
 
@@ -233,7 +237,7 @@ void distributed_gradient( const gsl_vector * x , void * params , gsl_vector * g
 	int evaluate = 2; // code for this type of evaluation
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: evaluating %s at %0.6f" , MPI_Wtime()-start , EVAL_TYPE(2) , x->data[0] );
+	printf( "%0.6f: (global) evaluating %s at %0.6f" , MPI_Wtime()-start , EVAL_TYPE(2) , x->data[0] );
 	for( i = 1 ; i < p->Nvars ; i++ ) { printf( " , %0.6f" , x->data[i] ); }
 	printf( "\n" );
 #endif
@@ -255,6 +259,10 @@ void distributed_gradient( const gsl_vector * x , void * params , gsl_vector * g
 	// reduction step (gradient only)
 	MPI_Reduce( (void*)(p->b) , g->data , p->Nvars , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
 
+#ifdef _GSLREGRESS_VERBOSE
+	printf( "%0.6f: (global) past reduction\n" , MPI_Wtime()-start , p );
+#endif
+
 	// normalization after reduction
 	for( i = 0 ; i < p->Nvars ; i++ ) {
 		g->data[i] /= ((double)(p->Nobsv));
@@ -270,7 +278,7 @@ void distributed_objective_and_gradient( const gsl_vector * x , void * params , 
 	int evaluate = 3; // code for this type of evaluation
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: evaluating %s at %0.6f" , MPI_Wtime()-start , EVAL_TYPE(3) , x->data[0] );
+	printf( "%0.6f: (global) evaluating %s at %0.6f" , MPI_Wtime()-start , EVAL_TYPE(3) , x->data[0] );
 	for( i = 1 ; i < p->Nvars ; i++ ) { printf( " , %0.6f" , x->data[i] ); }
 	printf( "\n" );
 #endif
@@ -292,6 +300,10 @@ void distributed_objective_and_gradient( const gsl_vector * x , void * params , 
 
 	// reduction step (objective written into s, gradient written into r, have to buffer)
 	MPI_Reduce( (void*)(p->b) , (void*)buffer , p->Nvars + 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
+
+#ifdef _GSLREGRESS_VERBOSE
+	printf( "%0.6f: (global) past reduction\n" , MPI_Wtime()-start , p );
+#endif
 
 	// normalization
 	f[0] = buffer[p->Nvars] / ((double)(p->Nobsv));
