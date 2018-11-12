@@ -178,7 +178,7 @@ void gsl_ols( gls_ols_params * params )
 			gsl_matrix_set( X , n , i , params->data[ n * params->Nvars + i ] );
 		}
 		gsl_matrix_set( X , n , params->Nfeat-1 , 1.0 );
-		gsl_vector_set( y , i , params->data[ n * params->Nvars + K ] );
+		gsl_vector_set( y , i , params->data[ n * params->Nvars + params->Nfeat-1 ] );
 	}
 	gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( N , params->Nvars );
 	gsl_multifit_linear( X , y , c , S , &chisq , ols );
@@ -214,7 +214,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 
 	// evaluation function
 	gsl_multimin_function sos;
-	sos.n = params.Nvars; // features and constant
+	sos.n = params->Nvars; // features and constant
 	sos.f = &non_distributed_objective; // defined elsewhere
 	sos.params = (void*)params; // we'll pass the data object, allocated here, to objective evaluations
 
