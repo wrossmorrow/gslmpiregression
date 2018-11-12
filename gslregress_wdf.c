@@ -530,7 +530,6 @@ int main( int argc , char * argv[] )
 
 		// clean up after optimizer
 		gsl_vector_free( x );
-		gsl_vector_free( ss );
 		gsl_multimin_fdfminimizer_free( s );
 
 	} else {
