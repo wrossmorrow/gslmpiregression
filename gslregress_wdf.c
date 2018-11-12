@@ -233,7 +233,7 @@ void distributed_gradient( const gsl_vector * x , void * params , gsl_vector * g
 
 	if( x->stride != 1 || g->stride != 1 ) { // hopefully... 
 		printf( "only built to handle unit-stride vectors right now...\n" );
-		return GSL_NAN;
+		return;
 	}
 	
 	// send the evaluate flag, to tell worker processes what to do
@@ -270,7 +270,8 @@ void distributed_objective_and_gradient( const gsl_vector * x , void * params , 
 
 	if( x->stride != 1 || g->stride != 1 ) { // hopefully... 
 		printf( "only built to handle unit-stride vectors right now...\n" );
-		return GSL_NAN;
+		f[0] = GSL_NAN;
+		return;
 	}
 	
 	// send the evaluate flag, to tell worker processes what to do
