@@ -310,6 +310,53 @@ void distributed_objective_and_gradient( const gsl_vector * x , void * params , 
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * 
+ * STANDARD (UNWEIGHTED) ORDINARY LEAST SQUARES
+ * 
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+void gsl_ols( gls_ols_params * params , double * ols_c ) 
+{
+
+	int i , n;
+	double chisq = 0.0;
+	gsl_matrix * X = gsl_matrix_alloc( params->Nobsv , params->Nvars );
+	gsl_vector * y = gsl_vector_alloc( params->Nobsv );
+	gsl_vector * c = gsl_vector_alloc( params->Nvars );
+	gsl_matrix * S = gsl_matrix_alloc( params->Nvars , params->Nvars );
+	for( n = 0 ; n < params->Nobsv ; n++ ) {
+		for( i = 0 ; i < params->Nfeat ; i++ ) {
+			gsl_matrix_set( X , n , i , params->data[ n * params->Nvars + i ] );
+		}
+		gsl_matrix_set( X , n , params->Nfeat , 1.0 );
+		gsl_vector_set( y , n , params->data[ n * params->Nvars + params->Nfeat ] );
+	}
+
+	gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( params->Nobsv , params->Nvars );
+	gsl_multifit_linear( X , y , c , S , &chisq , ols );
+	gsl_multifit_linear_free( ols );
+	gsl_matrix_free( X );
+	gsl_vector_free( y );
+	gsl_matrix_free( S );
+
+	if( ols_c != NULL ) {
+		for( i = 0 ; i < params->Nvars ; i++ ) { 
+			ols_c[i] = gsl_vector_get( c , i );
+		}
+	}
+
+	printf( "%0.6f: GSL OLS estimates: %0.3f" , MPI_Wtime()-start , gsl_vector_get( c , 0 ) );
+	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.3f" , gsl_vector_get( c , i ) ); }
+	printf( "\n" );
+	gsl_vector_free( c );
+
+}
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * 
  * EXECUTABLE ROUTINE
  * 
  * Set up MPI, all-process problem data, setup and start optimization in the root process and run loop
@@ -425,6 +472,8 @@ int main( int argc , char * argv[] )
 		}
 #endif
 */
+		// standard OLS
+		gsl_ols( &params , NULL );
 
 		// initial barrier
 		MPI_Barrier( MPI_COMM_WORLD );
