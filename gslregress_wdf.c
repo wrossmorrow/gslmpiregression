@@ -442,6 +442,10 @@ int main( int argc , char * argv[] )
 		// allocate space for coefficients
 		coeffs = ( double * )malloc( params.Nvars * sizeof( double ) );
 		for( i = 0 ; i < params.Nvars ; i++ ) { coeffs[i] = urand(); }
+			
+		printf( "%0.6f: real coefficients: %0.3f" , MPI_Wtime()-start , p , coeffs[0] );
+		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , coeffs[i] ); }
+		printf( "\n" );
 
 #ifdef _GSLREGRESS_VERBOSE
 		printf( "%0.6f: process %i: real coefficients: %0.2f" , MPI_Wtime()-start , p , coeffs[0] );
@@ -576,12 +580,9 @@ int main( int argc , char * argv[] )
 		printf( "%0.6f: process %i: finished iterations\n" , MPI_Wtime()-start , p );
 #endif
 
-		// only non-verbose print
-		printf( "%0.6f: process %i: real coefficients: %0.2f" , MPI_Wtime()-start , p , coeffs[0] );
-		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , coeffs[i] ); }
-		printf( "\n" );
-		printf( "%0.6f: process %i: estimated coeffs: %0.2f" , MPI_Wtime()-start , p , ((s->x)->data)[0] );
-		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , ((s->x)->data)[i] ); }
+		// non-verbose print
+		printf( "%0.6f: process %i: estimated coeffs: %0.3f" , MPI_Wtime()-start , p , ((s->x)->data)[0] );
+		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , ((s->x)->data)[i] ); }
 		printf( "\n" );
 
 		// ** IMPORTANT ** 
