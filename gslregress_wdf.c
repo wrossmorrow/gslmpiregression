@@ -475,7 +475,7 @@ int main( int argc , char * argv[] )
 #endif
 
 		// "register" these with the minimizer
-		gsl_multimin_fdfminimizer_set( s , &sos , x , ss );
+		gsl_multimin_fdfminimizer_set( s , &sos , x , ss , GSLREGRESS_OPT_TOL );
 
 		// synchronize before starting iterations
 		// 
@@ -532,7 +532,7 @@ int main( int argc , char * argv[] )
 		// clean up after optimizer
 		gsl_vector_free( x );
 		gsl_vector_free( ss );
-		gsl_multimin_fminimizer_free( s );
+		gsl_multimin_fdfminimizer_free( s );
 
 	} else {
 
