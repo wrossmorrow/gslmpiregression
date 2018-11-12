@@ -79,6 +79,9 @@ typedef struct gls_ols_params {
 	double * b; // buffer... holds s and ds together here, ds in b[0,Ncols) and s in b[Ncols]
 } gls_ols_params;
 
+// this is a global buffer to facilitate objective-and-gradient reduction
+static double * buffer;
+
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -287,7 +290,7 @@ void distributed_objective_and_gradient( const gsl_vector * x , void * params , 
 	subproblem_objective_and_gradient( x->data , p );
 
 	// reduction step (objective written into s, gradient written into r, have to buffer)
-	MPI_Reduce( (void*)(p->b) , buffer , p->Nvars + 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
+	MPI_Reduce( (void*)(p->b) , (void*)buffer , p->Nvars + 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
 
 	// normalization
 	f[0] = buffer[p->Nvars] / ((double)(p->Nobsv));
@@ -469,6 +472,10 @@ int main( int argc , char * argv[] )
 			gsl_vector_set( x , i , 2.0 * urand() - 1.0 );
 		}
 
+		// Here, we _also_ need the reduction buffer
+		buffer = ( double * )malloc( ( params.Nvars + 1 ) * sizeof( double ) );
+		for( i = 0 ; i < params.Nvars + 1 ; i++ ) { buffer[i] = 0.0; }
+
 #ifdef _GSLREGRESS_VERBOSE
 		printf( "%0.6f: process %i: registering problem\n" , MPI_Wtime()-start , p );
 #endif
@@ -531,6 +538,8 @@ int main( int argc , char * argv[] )
 		// clean up after optimizer
 		gsl_vector_free( x );
 		gsl_multimin_fdfminimizer_free( s );
+
+		free( buffer );
 
 	} else {
 
