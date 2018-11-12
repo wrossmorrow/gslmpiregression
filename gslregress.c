@@ -120,9 +120,11 @@ double distributed_objective( const gsl_vector * x , void * params )
   gls_ols_params * p = ( gls_ols_params * )params;
   int evaluate = 1;
 
+#ifdef _GSLREGRESS_VERBOSE
   printf( "%0.6f: evaluating objective at %0.6f" , MPI_Wtime()-start , x->data[0] );
   for( i = 1 ; i < p->Nvars ; i++ ) { printf( " , %0.6f" , x->data[i] ); }
   printf( "\n" );
+#endif
 
   if( x->stride != 1 ) { // hopefully... 
     return NAN;
@@ -143,7 +145,9 @@ double distributed_objective( const gsl_vector * x , void * params )
   // normalization
   f /= ((double)(p->Nobsv));
 
+#ifdef _GSLREGRESS_VERBOSE
   printf( "%0.6f: obtained %0.6f...\n" , MPI_Wtime()-start , f );
+#endif
 
   return f;
 }
@@ -289,7 +293,9 @@ int main( int argc , char * argv[] )
 
     // setup GSL optimizer
 
+#ifdef _GSLREGRESS_VERBOSE
     printf( "%0.6f: process %i: setting up GSL optimizer\n" , MPI_Wtime()-start , p );
+#endif
 
     // minimizer object
     const gsl_multimin_fminimizer_type * T = gsl_multimin_fminimizer_nmsimplex2;
@@ -311,7 +317,9 @@ int main( int argc , char * argv[] )
       gsl_vector_set( x , i , 2.0 * urand() - 1.0 );
     }
 
+#ifdef _GSLREGRESS_VERBOSE
     printf( "%0.6f: process %i: registering problem\n" , MPI_Wtime()-start , p );
+#endif
 
     // "register" these with the minimizer
     gsl_multimin_fminimizer_set( s , &sos , x , ss );
@@ -324,7 +332,9 @@ int main( int argc , char * argv[] )
     // 
     // MPI_Barrier( MPI_COMM_WORLD ); 
 
+#ifdef _GSLREGRESS_VERBOSE
     printf( "%0.6f: process %i: starting iterations\n" , MPI_Wtime()-start , p );
+#endif
 
     // iterations
     status = GSL_CONTINUE;
@@ -336,7 +346,9 @@ int main( int argc , char * argv[] )
       status = gsl_multimin_fminimizer_iterate( s );
       iter++;
 
+#ifdef _GSLREGRESS_VERBOSE
       printf( "%0.6f: process %i: iteration %i\n" , MPI_Wtime()-start , p , iter );
+#endif
 
       if( status ) { break; } // iteration failure? 
 
@@ -345,16 +357,17 @@ int main( int argc , char * argv[] )
 
     } while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
 
-    printf( "%0.6f: process %i: finished iterations\n" , MPI_Wtime()-start , p );
-
 #ifdef _GSLREGRESS_VERBOSE
+    printf( "%0.6f: process %i: finished iterations\n" , MPI_Wtime()-start , p );
+#endif
+
+    // only non-verbose print
     printf( "%0.6f: process %i: real coefficients: %0.2f" , MPI_Wtime()-start , p , coeffs[0] );
     for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , coeffs[i] ); }
     printf( "\n" );
     printf( "%0.6f: process %i: estimated coeffs: %0.2f" , MPI_Wtime()-start , p , ((s->x)->data)[0] );
     for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , ((s->x)->data)[i] ); }
     printf( "\n" );
-#endif
 
     // ** IMPORTANT ** 
     //
@@ -396,19 +409,24 @@ int main( int argc , char * argv[] )
       // get status, and evaluate to see if we should continue
       MPI_Bcast( (void*)(&status) , 1 , MPI_INT , 0 , MPI_COMM_WORLD );
       if( status != 1 ) { 
-	printf( "%0.6f:  process %i: exiting worker loop\n" , MPI_Wtime()-start , p );
+#ifdef _GSLREGRESS_VERBOSE
+	printf( "%0.6f: process %i: exiting worker loop\n" , MPI_Wtime()-start , p );
+#endif
 	break; 
       }
 
-      // 
-      printf( "%0.6f:  process %i: continuing\n" , MPI_Wtime()-start , p );
+#ifdef _GSLREGRESS_VERBOSE
+      printf( "%0.6f: process %i: continuing\n" , MPI_Wtime()-start , p );
+#endif
 
       // get variables
       MPI_Bcast( (void*)(params.x) , params.Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
 
-      printf( "%0.6f:   process %i evaluating at %0.6f" , MPI_Wtime()-start , p , params.x[0] );
+#ifdef _GSLREGRESS_VERBOSE
+      printf( "%0.6f: process %i evaluating at %0.6f" , MPI_Wtime()-start , p , params.x[0] );
       for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.6f" , params.x[i] ); }
       printf( "\n" );
+#endif
 
       // local evaluation, writes into params.s
       subproblem_objective( params.x , &params );
