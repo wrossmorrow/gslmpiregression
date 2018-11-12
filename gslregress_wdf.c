@@ -216,10 +216,6 @@ double distributed_objective( const gsl_vector * x , void * params )
 	// reduction step
 	MPI_Reduce( (void*)( p->b + p->Ncols ) , &f , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
 
-#ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: (global) past reduction\n" , MPI_Wtime()-start , p );
-#endif
-
 	// normalization
 	f /= ((double)(p->Nobsv));
 
@@ -259,10 +255,6 @@ void distributed_gradient( const gsl_vector * x , void * params , gsl_vector * g
 	// reduction step (gradient only)
 	MPI_Reduce( (void*)(p->b) , g->data , p->Nvars , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
 
-#ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: (global) past reduction\n" , MPI_Wtime()-start , p );
-#endif
-
 	// normalization after reduction
 	for( i = 0 ; i < p->Nvars ; i++ ) {
 		g->data[i] /= ((double)(p->Nobsv));
@@ -295,19 +287,11 @@ void distributed_objective_and_gradient( const gsl_vector * x , void * params , 
 	// send variables
 	MPI_Bcast( (void*)(x->data) , p->Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
 
-#ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: (global) past broadcasts\n" , MPI_Wtime()-start , p );
-#endif
-
 	// local evaluation
 	subproblem_objective_and_gradient( x->data , p );
 
 	// reduction step (objective written into s, gradient written into r, have to buffer)
 	MPI_Reduce( (void*)(p->b) , (void*)buffer , p->Nvars + 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
-
-#ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: (global) past reduction\n" , MPI_Wtime()-start , p );
-#endif
 
 	// normalization
 	f[0] = buffer[p->Nvars] / ((double)(p->Nobsv));
@@ -619,27 +603,18 @@ int main( int argc , char * argv[] )
 					subproblem_objective_only( params.x , &params );
 					// sum-reduce to accumulate parts back in the root process
 					MPI_Reduce( (void*)( params.b + params.Ncols ) , NULL , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
-#ifdef _GSLREGRESS_VERBOSE
-					printf( "%0.6f: process %i: past reduction\n" , MPI_Wtime()-start , p );
-#endif
 					break;
 				case 2 : // gradient only
 					// local evaluation, writes into params.b
 					subproblem_gradient_only( params.x , &params );
 					// sum-reduce to accumulate parts back in the root process
 					MPI_Reduce( (void*)( params.b ) , NULL , params.Nvars , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
-#ifdef _GSLREGRESS_VERBOSE
-					printf( "%0.6f: process %i: past reduction\n" , MPI_Wtime()-start , p );
-#endif
 					break;
 				case 3 : // objective and gradient
 					// local evaluation, writes into params.b
 					subproblem_objective_and_gradient( params.x , &params );
 					// sum-reduce to accumulate parts back in the root process
 					MPI_Reduce( (void*)( params.b ) , NULL , params.Nvars + 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
-#ifdef _GSLREGRESS_VERBOSE
-					printf( "%0.6f: process %i: past reduction\n" , MPI_Wtime()-start , p );
-#endif
 					break;
 				default: 
 					printf( "%0.6f: process %i: unknown evaluation code: %i\n" , MPI_Wtime()-start , p , status );
