@@ -102,6 +102,22 @@ void subproblem_objective( const double * x , gls_ols_params * p )
 	p->s /= 2.0; // absorb typical factor-of-two normalization in OLS
 }
 
+void non_distributed_objective( const double * x , gls_ols_params * p )
+{
+	int i , k;
+
+	// compute the residuals from the data and coefficients
+	p->s = 0.0;
+	for( i = 0 ; i < p->Nobsv ; i++ ) { 
+		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+		for( k = 0 ; k < p->Nfeat ; k++ ) { 
+			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * x[ k ]; // accumulate dot product into the residual
+		}
+		p->s += p->r[i] * p->r[i]; // accumulate sum-of-squares
+	}
+	p->s /= 2.0; // absorb typical factor-of-two normalization in OLS
+}
+
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -180,7 +196,7 @@ void gsl_ols( gls_ols_params * params )
 		gsl_matrix_set( X , n , params->Nfeat-1 , 1.0 );
 		gsl_vector_set( y , i , params->data[ n * params->Nvars + params->Nfeat-1 ] );
 	}
-	gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( N , params->Nvars );
+	gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( params->Nobsv , params->Nvars );
 	gsl_multifit_linear( X , y , c , S , &chisq , ols );
 	gsl_multifit_linear_free( ols );
 	gsl_matrix_free( X );
