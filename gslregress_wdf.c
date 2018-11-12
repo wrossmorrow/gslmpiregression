@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <math.h>
 
 #include <mpi.h>
@@ -193,7 +194,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 	int evaluate = 1; // code for this type of evaluation
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: evaluating objective at %0.6f" , MPI_Wtime()-start , x->data[0] );
+	printf( "%0.6f: evaluating %s at %0.6f" , MPI_Wtime()-start , EVAL_TYPE(1) , x->data[0] );
 	for( i = 1 ; i < p->Nvars ; i++ ) { printf( " , %0.6f" , x->data[i] ); }
 	printf( "\n" );
 #endif
@@ -232,7 +233,7 @@ void distributed_gradient( const gsl_vector * x , void * params , gsl_vector * g
 	int evaluate = 2; // code for this type of evaluation
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: evaluating gradient at %0.6f" , MPI_Wtime()-start , x->data[0] );
+	printf( "%0.6f: evaluating %s at %0.6f" , MPI_Wtime()-start , EVAL_TYPE(2) , x->data[0] );
 	for( i = 1 ; i < p->Nvars ; i++ ) { printf( " , %0.6f" , x->data[i] ); }
 	printf( "\n" );
 #endif
@@ -269,7 +270,7 @@ void distributed_objective_and_gradient( const gsl_vector * x , void * params , 
 	int evaluate = 3; // code for this type of evaluation
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: evaluating objective and gradient at %0.6f" , MPI_Wtime()-start , x->data[0] );
+	printf( "%0.6f: evaluating %s at %0.6f" , MPI_Wtime()-start , EVAL_TYPE(3) , x->data[0] );
 	for( i = 1 ; i < p->Nvars ; i++ ) { printf( " , %0.6f" , x->data[i] ); }
 	printf( "\n" );
 #endif
@@ -330,6 +331,9 @@ int main( int argc , char * argv[] )
 	// here we create a parameters structure for our use
 	gls_ols_params params;
 
+	// seed random number generator
+	srand( time(NULL) );
+
 	// always initialize MPI... after this call argc and argv are like normal executable
 	// arguments we can use
 	MPI_Init( &argc , &argv );
@@ -338,7 +342,7 @@ int main( int argc , char * argv[] )
 	MPI_Comm_rank( MPI_COMM_WORLD , &p );
 	MPI_Comm_size( MPI_COMM_WORLD , &P );
 
-	// 
+	// processor name, if we want it for prints
 	char procname[ MPI_MAX_PROCESSOR_NAME ];
 	int procnamelength;
 	MPI_Get_processor_name( procname , &procnamelength );
@@ -375,14 +379,14 @@ int main( int argc , char * argv[] )
 	for( i = 0 ; i < params.Nvars ; i++ ) { (params.x)[i] = 0.0; }
 
 	// residuals... as many as observations we are tracking in this process
-	params.b = ( double * )malloc( params.Ncols * sizeof( double ) );
-	for( i = 0 ; i < params.Ncols ; i++ ) { (params.b)[i] = 0.0; }
+	params.r = ( double * )malloc( params.Ncols * sizeof( double ) );
+	for( i = 0 ; i < params.Ncols ; i++ ) { (params.r)[i] = 0.0; }
 
 	// buffer... Nvars for gradient + 1 for objective
 	params.b = ( double * )malloc( ( params.Nvars + 1 ) * sizeof( double ) );
 	for( i = 0 ; i < params.Nvars + 1 ; i++ ) { (params.b)[i] = 0.0; }
 
-	// root/worker differentiation starts...
+	// root/worker differentiation starts here...
 
 	if( p == 0 ) {
 
@@ -582,7 +586,7 @@ int main( int argc , char * argv[] )
 			MPI_Bcast( (void*)(params.x) , params.Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
 
 #ifdef _GSLREGRESS_VERBOSE
-			printf( "%0.6f: process %i evaluating %s at %0.6f" , MPI_Wtime()-start , p , EVAL_TYPE(status) , params.x[0] );
+			printf( "%0.6f: process %i: evaluating %s at %0.6f" , MPI_Wtime()-start , p , EVAL_TYPE(status) , params.x[0] );
 			for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.6f" , params.x[i] ); }
 			printf( "\n" );
 #endif
