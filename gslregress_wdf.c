@@ -450,13 +450,7 @@ int main( int argc , char * argv[] )
 
 		// minimizer object
 		const gsl_multimin_fdfminimizer_type * T = gsl_multimin_fdfminimizer_vector_bfgs;
-		gsl_multimin_fdfminimizer * s = gsl_multimin_fdfminimizer_alloc( T , params.Nvars );    /
-		;'km
-
-
-
-
-		// // / // n nbgfcgdr/sa'
+		gsl_multimin_fdfminimizer * s = gsl_multimin_fdfminimizer_alloc( T , params.Nvars );
 
 		// evaluation function
 		gsl_multimin_function_fdf sos;
