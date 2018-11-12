@@ -35,7 +35,7 @@
 #include <gsl/gsl_multimin.h>
 
 // comment out to suppress (most) messages, including data print
-// #define _GSLREGRESS_VERBOSE
+#define _GSLREGRESS_VERBOSE
 
 // optimization tolerance
 #define GSLREGRESS_OPT_TOL 1.0e-4
@@ -199,6 +199,17 @@ void gsl_ols( gls_ols_params * params )
 		gsl_matrix_set( X , n , params->Nfeat , 1.0 );
 		gsl_vector_set( y , n , params->data[ n * params->Nvars + params->Nfeat-1 ] );
 	}
+
+#ifdef _GSLREGRESS_VERBOSE
+	for( n = 0 ; n < params->Nobsv ; n++ ) {
+		printf( "  %0.3f" , gsl_matrix_get( X , n , 0 ) );
+		for( i = 1 ; i < params->Nvars ; i++ ) {
+			printf( " , %0.3f" , gsl_matrix_get( X , n , i ) );
+		}
+		printf( " | %0.3f\n" , gsl_vector_get( y , n ) );
+	}
+#endif
+
 	gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( params->Nobsv , params->Nvars );
 	gsl_multifit_linear( X , y , c , S , &chisq , ols );
 	gsl_multifit_linear_free( ols );
