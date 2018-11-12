@@ -553,8 +553,16 @@ int main( int argc , char * argv[] )
 		// size the data array: we will expect to get Ncols "columns" each of length K+1 = Nvars (contiguous)
 		params.data = ( double * )malloc( ( params.Ncols * params.Nvars ) * sizeof( double ) );
 
+#ifdef _GSLREGRESS_VERBOSE
+				printf( "%0.6f: process %i: waiting for data...\n" , MPI_Wtime()-start , p );
+#endif
+
 		// receiving-end scatterv, write result into "data"
 		MPI_Scatterv( NULL , NULL , NULL , MPI_DOUBLE , (void*)(params.data) , params.Ncols * params.Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
+
+#ifdef _GSLREGRESS_VERBOSE
+				printf( "%0.6f: process %i: received data...\n" , MPI_Wtime()-start , p );
+#endif
 
 		// do any local setup required with this data...
 
