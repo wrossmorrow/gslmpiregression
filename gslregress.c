@@ -417,13 +417,13 @@ int main( int argc , char * argv[] )
 
 		// do a "standard" regression with the GSL tools
 		method_start = MPI_Wtime();
-		printf( "%0.6f: GSL Multimin Estimation...\n" , MPI_Wtime()-start );
+		printf( "%0.6f: GSL OLS Regression...\n" , MPI_Wtime()-start );
 		gsl_ols( &params , NULL );
 		printf( "%0.6f:   took %0.6fs (don't compare to others)\n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
 
-		method_start = MPI_Wtime();
-		printf( "%0.6f: GSL Multimin Estimation...\n" , MPI_Wtime()-start );
 		// do a "serial" minimization, exactly what we do below but without distributing the objective
+		method_start = MPI_Wtime();
+		printf( "%0.6f: Serial GSL Multimin Estimation...\n" , MPI_Wtime()-start );
 		gsl_minimize( &params , x0 );
 		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
 
@@ -547,6 +547,8 @@ int main( int argc , char * argv[] )
 		gsl_multimin_fminimizer_free( s );
 
 		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
+
+		free( x0 );
 
 	} else {
 

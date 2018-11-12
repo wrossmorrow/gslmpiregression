@@ -359,6 +359,156 @@ void gsl_ols( gls_ols_params * params , double * ols_c )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * 
+ * NON-DISTRIBUTED OPTIMIZATION
+ * 
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+static double * residuals;
+
+double non_distributed_objective_only( const gsl_vector * x , void * params )
+{
+	int i , k;
+	double f;
+	gls_ols_params * p = ( gls_ols_params * )params;
+
+	// compute the residuals from the data and coefficients
+	f = 0.0;
+	for( i = 0 ; i < p->Nobsv ; i++ ) { 
+		residuals[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+		for( k = 0 ; k < p->Nfeat ; k++ ) { 
+			residuals[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
+		}
+		f += residuals[i] * residuals[i]; // accumulate sum-of-squares
+	}
+	f /= 2.0 * ((double)(p->Nobsv)) ; // absorb typical factor-of-two normalization in OLS
+	return f;
+}
+
+void non_distributed_gradient_only( const gsl_vector * x , void * params , gsl_vector * g )
+{
+	int i , k;
+	gls_ols_params * p = ( gls_ols_params * )params;
+
+	// compute the residuals from the data and coefficients
+	for( i = 0 ; i < p->Nobsv ; i++ ) { 
+		residuals[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+		for( k = 0 ; k < p->Nfeat ; k++ ) { 
+			residuals[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
+		}
+	}
+
+	// feature terms
+	for( k = 0 ; k < p->Nfeat ; k++ ) {
+		gsl_vector_set( g , k , 0.0 );
+		for( i = 0 ; i < p->Nobsv ; i++ ) { 
+			gsl_vector_set( g , k , gsl_vector_get( g , k ) + p->data[ i*(p->Nvars) + k ] * residuals[i] );
+		}
+	}
+
+	// constant term
+	gsl_vector_set( g , p->Nfeat , 0.0 ); 
+	for( i = 0 ; i < p->Nobsv ; i++ ) { 
+		gsl_vector_set( g , p->Nfeat , gsl_vector_get( g , p->Nfeat ) + residuals[i] ); 
+	}
+}
+
+void non_distributed_objective_and_gradient( const gsl_vector * x , void * params , double * f , gsl_vector * g )
+{
+	int i , k;
+	gls_ols_params * p = ( gls_ols_params * )params;
+
+	// compute the residuals from the data and coefficients
+	f[0] = 0.0;
+	for( i = 0 ; i < p->Nobsv ; i++ ) { 
+		residuals[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+		for( k = 0 ; k < p->Nfeat ; k++ ) { 
+			residuals[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
+		}
+		f[0] += residuals[i] * residuals[i]; // accumulate sum-of-squares
+	}
+	f[0] /= 2.0 * ((double)(p->Nobsv)) ; // absorb typical factor-of-two normalization in OLS
+
+	// feature terms
+	for( k = 0 ; k < p->Nfeat ; k++ ) {
+		gsl_vector_set( g , k , 0.0 );
+		for( i = 0 ; i < p->Nobsv ; i++ ) { 
+			gsl_vector_set( g , k , gsl_vector_get( g , k ) + p->data[ i*(p->Nvars) + k ] * residuals[i] );
+		}
+	}
+
+	// constant term
+	gsl_vector_set( g , p->Nfeat , 0.0 ); 
+	for( i = 0 ; i < p->Nobsv ; i++ ) { 
+		gsl_vector_set( g , p->Nfeat , gsl_vector_get( g , p->Nfeat ) + residuals[i] ); 
+	}
+
+}
+
+void gsl_minimize( gls_ols_params * params , const double * x0 ) 
+{
+	int i;
+
+	residuals = ( double * )malloc( params->Nobsv * sizeof( double ) );
+	for( i = 0 ; i < params->Nobsv ; i++ ) { residuals[i] = 0.0; }
+
+	// minimizer object
+	const gsl_multimin_fdfminimizer_type * T = gsl_multimin_fdfminimizer_vector_bfgs;
+	gsl_multimin_fdfminimizer * s = gsl_multimin_fdfminimizer_alloc( T , params->Nvars );
+
+	// evaluation function
+	gsl_multimin_function sos;
+	sos.n = params->Nvars; // features and constant
+	sos.f = &non_distributed_objective_only; // defined elsewhere
+	sos.df = &non_distributed_gradient_only;
+	sos.fdf = &non_distributed_objective_and_gradient;
+	sos.params = (void*)params; // we'll pass the data object, allocated here, to objective evaluations
+
+	// step size
+	gsl_vector * ss = gsl_vector_alloc( params->Nvars );
+	gsl_vector_set_all( ss , 1.0 );
+
+	// initial point (random guess)
+	gsl_vector * x = gsl_vector_alloc( params->Nvars );
+	for( i = 0 ; i < params->Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
+
+	// "register" these with the minimizer
+	gsl_multimin_fdfminimizer_set( s , &sos , x , GSLREGRESS_STEP_SIZE , GSLREGRESS_OPT_TOL );
+
+	// iterations
+	int status = GSL_CONTINUE;
+	int iter = 0; 
+	double size;
+	do {
+
+		// iterate will call the distributed objective
+		status = gsl_multimin_fdfminimizer_iterate( s );
+		iter++;
+
+		if( status ) { break; } // iteration failure? 
+
+		status = gsl_multimin_test_gradient( s->gradient , GSLREGRESS_OPT_TOL );
+
+	} while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
+
+	// print out result obtained
+	printf( "%0.6f: estimated coeffs: %0.3f" , MPI_Wtime()-start , gsl_vector_get( s->x , 0 ) );
+	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.3f" , gsl_vector_get( s->x , i ) ); }
+	printf( "\n" );
+
+	// clean up after optimizer
+	gsl_vector_free( x );
+	gsl_multimin_fdfminimizer_free( s );
+
+	free( residuals );
+
+}
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * 
  * EXECUTABLE ROUTINE
  * 
  * Set up MPI, all-process problem data, setup and start optimization in the root process and run loop
@@ -376,6 +526,8 @@ int main( int argc , char * argv[] )
 	int status;
 
 	double * coeffs;
+
+	double method_start;
 
 	// here we create a parameters structure for our use
 	gls_ols_params params;
@@ -442,16 +594,10 @@ int main( int argc , char * argv[] )
 		// allocate space for coefficients
 		coeffs = ( double * )malloc( params.Nvars * sizeof( double ) );
 		for( i = 0 ; i < params.Nvars ; i++ ) { coeffs[i] = urand(); }
-			
+
 		printf( "%0.6f: real coefficients: %0.3f" , MPI_Wtime()-start , p , coeffs[0] );
 		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , coeffs[i] ); }
 		printf( "\n" );
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: real coefficients: %0.2f" , MPI_Wtime()-start , p , coeffs[0] );
-		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , coeffs[i] ); }
-		printf( "\n" );
-#endif
 
 		// size the data array: root process will create all the data, and send it out
 		// This "mimics" a read-disperse model of smaller data problems, where the complexity 
@@ -478,8 +624,26 @@ int main( int argc , char * argv[] )
 		}
 #endif
 */
-		// standard OLS
+		// initial condition
+		double * x0 = ( double * )malloc( params.Nvars * sizeof( double ) );
+		for( i = 0 ; i < params.Nvars ; i++ ) { x0[i] = 2.0 * urand() - 1.0; }
+
+		// do a "standard" regression with the GSL tools
+		method_start = MPI_Wtime();
+		printf( "%0.6f: GSL OLS Regression...\n" , MPI_Wtime()-start );
 		gsl_ols( &params , NULL );
+		printf( "%0.6f:   took %0.6fs (don't compare to others)\n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
+
+		// do a "serial" minimization, exactly what we do below but without distributing the objective
+		method_start = MPI_Wtime();
+		printf( "%0.6f: Serial GSL Multimin Estimation...\n" , MPI_Wtime()-start );
+		gsl_minimize( &params , x0 );
+		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
+
+		// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
+
+		method_start = MPI_Wtime();
+		printf( "%0.6f: Distributed GSL Multimin Estimation... \n" , MPI_Wtime()-start );
 
 		// initial barrier
 		MPI_Barrier( MPI_COMM_WORLD );
@@ -529,9 +693,7 @@ int main( int argc , char * argv[] )
 
 		// initial point (random guess)
 		gsl_vector * x = gsl_vector_alloc( params.Nvars );
-		for( i = 0 ; i < params.Nvars ; i++ ) {
-			gsl_vector_set( x , i , 2.0 * urand() - 1.0 );
-		}
+		for( i = 0 ; i < params.Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
 
 		// Here, we _also_ need the reduction buffer
 		buffer = ( double * )malloc( ( params.Nvars + 1 ) * sizeof( double ) );
@@ -598,6 +760,10 @@ int main( int argc , char * argv[] )
 		gsl_multimin_fdfminimizer_free( s );
 
 		free( buffer );
+
+		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
+
+		free( x0 );
 
 	} else {
 
