@@ -115,25 +115,6 @@ void subproblem_objective( const double * x , gls_ols_params * p )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-double non_distributed_objective( const gsl_vector * x , void * params )
-{
-	int i , k;
-	double f;
-	gls_ols_params * p = ( gls_ols_params * )params;
-
-	// compute the residuals from the data and coefficients
-	f = 0.0;
-	for( i = 0 ; i < p->Nobsv ; i++ ) { 
-		(p->r)[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
-		for( k = 0 ; k < p->Nfeat ; k++ ) { 
-			(p->r)[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
-		}
-		f += (p->r)[i] * (p->r)[i]; // accumulate sum-of-squares
-	}
-	f /= 2.0 * ((double)(p->Nobsv)) ; // absorb typical factor-of-two normalization in OLS
-	return f;
-}
-
 double distributed_objective( const gsl_vector * x , void * params )
 {
 	int i;
@@ -230,14 +211,33 @@ void gsl_ols( gls_ols_params * params , double * ols_c )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+static double * residuals;
+
+double non_distributed_objective( const gsl_vector * x , void * params )
+{
+	int i , k;
+	double f;
+	gls_ols_params * p = ( gls_ols_params * )params;
+
+	// compute the residuals from the data and coefficients
+	f = 0.0;
+	for( i = 0 ; i < p->Nobsv ; i++ ) { 
+		residuals[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+		for( k = 0 ; k < p->Nfeat ; k++ ) { 
+			residuals[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
+		}
+		f += residuals[i] * residuals[i]; // accumulate sum-of-squares
+	}
+	f /= 2.0 * ((double)(p->Nobsv)) ; // absorb typical factor-of-two normalization in OLS
+	return f;
+}
+
 void gsl_minimize( gls_ols_params * params , const double * x0 ) 
 {
 	int i;
 
-	// ** HACK ** 
-	free( params->r );
-	params->r = ( double * )malloc( params->Nobsv * sizeof( double ) );
-	for( i = 0 ; i < params->Nobsv ; i++ ) { (params->r)[i] = 0.0; }
+	residuals = ( double * )malloc( params->Nobsv * sizeof( double ) );
+	for( i = 0 ; i < params->Nobsv ; i++ ) { residuals[i] = 0.0; }
 
 	// minimizer object
 	const gsl_multimin_fminimizer_type * T = gsl_multimin_fminimizer_nmsimplex2;
@@ -287,11 +287,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 	gsl_vector_free( ss );
 	gsl_multimin_fminimizer_free( s );
 
-	// ** HACK **
-
-	free( params->r );
-	params->r = ( double * )malloc( params->Ncols * sizeof( double ) );
-	for( i = 0 ; i < params->Nobsv ; i++ ) { (params->r)[i] = 0.0; }
+	free( residuals );
 
 }
 
