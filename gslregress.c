@@ -377,6 +377,10 @@ int main( int argc , char * argv[] )
 		coeffs = ( double * )malloc( params.Nvars * sizeof( double ) );
 		for( i = 0 ; i < params.Nvars ; i++ ) { coeffs[i] = urand(); }
 
+		printf( "%0.6f: real coefficients: %0.3f" , MPI_Wtime()-start , p , coeffs[0] );
+		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , coeffs[i] ); }
+		printf( "\n" );
+
 #ifdef _GSLREGRESS_VERBOSE
 		printf( "%0.6f: process %i: real coefficients: %0.2f" , MPI_Wtime()-start , p , coeffs[0] );
 		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , coeffs[i] ); }
@@ -419,7 +423,7 @@ int main( int argc , char * argv[] )
 		printf( "%0.6f: GSL Multimin Estimation...\n" , MPI_Wtime()-start );
 		// do a "serial" minimization, exactly what we do below but without distributing the objective
 		gsl_minimize( &params , x0 );
-		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime() - method_start );
+		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
 
 		// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
@@ -523,9 +527,6 @@ int main( int argc , char * argv[] )
 #endif
 
 		// only non-verbose print
-		printf( "%0.6f: real coefficients: %0.3f" , MPI_Wtime()-start , p , coeffs[0] );
-		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , coeffs[i] ); }
-		printf( "\n" );
 		printf( "%0.6f: estimated coeffs: %0.3f" , MPI_Wtime()-start , p , ((s->x)->data)[0] );
 		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , ((s->x)->data)[i] ); }
 		printf( "\n" );
@@ -542,8 +543,8 @@ int main( int argc , char * argv[] )
 		gsl_vector_free( x );
 		gsl_vector_free( ss );
 		gsl_multimin_fminimizer_free( s );
-		
-		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime() - method_start );
+
+		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
 
 	} else {
 
