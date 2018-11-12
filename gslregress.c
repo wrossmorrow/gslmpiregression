@@ -197,7 +197,7 @@ void gsl_ols( gls_ols_params * params )
 			gsl_matrix_set( X , n , i , params->data[ n * params->Nvars + i ] );
 		}
 		gsl_matrix_set( X , n , params->Nfeat-1 , 1.0 );
-		gsl_vector_set( y , i , params->data[ n * params->Nvars + params->Nfeat-1 ] );
+		gsl_vector_set( y , n , params->data[ n * params->Nvars + params->Nfeat-1 ] );
 	}
 	gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( params->Nobsv , params->Nvars );
 	gsl_multifit_linear( X , y , c , S , &chisq , ols );
@@ -206,7 +206,7 @@ void gsl_ols( gls_ols_params * params )
 	gsl_vector_free( y );
 	gsl_matrix_free( S );
 
-	printf( "%0.6f: OLS estimates: %0.2f" , MPI_Wtime()-start , gsl_vector_get( c , 0 ) );
+	printf( "%0.6f: GSL OLS estimates: %0.2f" , MPI_Wtime()-start , gsl_vector_get( c , 0 ) );
 	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.2f" , gsl_vector_get( c , i ) ); }
 	printf( "\n" );
 	gsl_vector_free( c );
