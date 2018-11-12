@@ -507,10 +507,10 @@ int main( int argc , char * argv[] )
 #endif
 
 		// only non-verbose print
-		printf( "%0.6f: process %i: real coefficients: %0.3f" , MPI_Wtime()-start , p , coeffs[0] );
+		printf( "%0.6f: real coefficients: %0.3f" , MPI_Wtime()-start , p , coeffs[0] );
 		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , coeffs[i] ); }
 		printf( "\n" );
-		printf( "%0.6f: process %i: estimated coeffs: %0.3f" , MPI_Wtime()-start , p , ((s->x)->data)[0] );
+		printf( "%0.6f: estimated coeffs: %0.3f" , MPI_Wtime()-start , p , ((s->x)->data)[0] );
 		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , ((s->x)->data)[i] ); }
 		printf( "\n" );
 
