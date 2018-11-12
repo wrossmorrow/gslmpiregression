@@ -475,7 +475,7 @@ int main( int argc , char * argv[] )
 #endif
 
 		// "register" these with the minimizer
-		gsl_multimin_fminimizer_set( s , &sos , x , ss );
+		gsl_multimin_fdfminimizer_set( s , &sos , x , ss );
 
 		// synchronize before starting iterations
 		// 
@@ -496,7 +496,7 @@ int main( int argc , char * argv[] )
 		do {
 
 			// iterate will call the distributed objective
-			status = gsl_multimin_fminimizer_iterate( s );
+			status = gsl_multimin_fdfminimizer_iterate( s );
 			iter++;
 
 #ifdef _GSLREGRESS_VERBOSE
@@ -505,8 +505,7 @@ int main( int argc , char * argv[] )
 
 			if( status ) { break; } // iteration failure? 
 
-			size = gsl_multimin_fminimizer_size( s );
-			status = gsl_multimin_test_size( size , GSLREGRESS_OPT_TOL );
+			status = gsl_multimin_test_gradient( s->gradient , GSLREGRESS_OPT_TOL );
 
 		} while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
 
