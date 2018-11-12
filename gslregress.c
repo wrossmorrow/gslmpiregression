@@ -1,4 +1,29 @@
 
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * 
+ * DISTRIBUTED, GSL-SOLVED (SIMULATED DATA) OLS REGRESSION
+ * 
+ * This file contains a fake ("simulated data") OLS regression using GSL with objective distributed using
+ * MPI. You can pass two (non-MPI) parameters to the executable: the number of observations N and the 
+ * number of features K. Then the problem solved is 
+ * 
+ *     min 1/(2N) sum_{n=1}^N ( sum_{k=1}^K D(k,n) x(k) + x(K+1) - y(n) )^2
+ *     wrt x(1),...,x(K+1)
+ * 
+ * That is, we minimize the (average, halved) sum-of-squares error of an affine (linear + constant) model 
+ * of the data columns/outcome pairs (D(:,n),y(n)). 
+ * 
+ * The code generates this data using a fixed set of "true" coefficients drawn at random in the root process. 
+ * It then ships subsets of the columns/outcome pairs to the worker processes in a hopefully balanced way. 
+ * The root process then can setup the optimizer, and runs iterations over a distributed objective that uses
+ * a signal-broadcast-reduce sequence of collective communication calls to orchestrate objective evaluations. 
+ * 
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
