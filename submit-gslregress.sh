@@ -1,5 +1,6 @@
 #!/bin/bash
-
+if [[ $# -lt 3 ]] ; then exit 1; fi
+SCRIPT=run-gslregress-${1}-${2}-${3}.sh
 echo "#!/bin/bash
 # 
 #SBATCH --job-name=gslregress-${1}-${2}-${3}
@@ -21,5 +22,5 @@ GSL_INCL=\"-I/share/software/user/open/gsl/2.3/include\"
 mpicc gslregress.c -o gslregress \${GSL_LIBS} \${GSL_INCL}
 
 LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:\${GSL_SHARED_LIB} ; export LD_LIBRARY_PATH
-mpirun -np ${1} gslregress ${2} ${3}" > gslregress-${1}-${2}-${3}.sh
-sbatch gslregress-${1}-${2}-${3}.sh
+mpirun -np ${1} gslregress ${2} ${3}" > ${SCRIPT}
+sbatch ${SCRIPT}
