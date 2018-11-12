@@ -1,0 +1,28 @@
+0.000004: process 1: number of variables... 6
+0.000076: process 1: number of features.... 5
+0.000087: process 1: number of columns..... 250
+0.000003: process 3: number of variables... 6
+0.000072: process 3: number of features.... 5
+0.000083: process 3: number of columns..... 250
+0.000004: process 0: number of variables... 6
+0.000081: process 0: number of features.... 5
+0.000092: process 0: number of columns..... 250
+0.000113: process 0: real coefficients: 0.05 , 0.36 , 0.50 , 0.73 , 0.44 , 0.26
+0.000003: process 2: number of variables... 6
+0.000070: process 2: number of features.... 5
+0.000081: process 2: number of columns..... 250
+0.000579: process 2: waiting for data...
+0.002548: process 3: waiting for data...
+0.000703: process 0: setting up GSL optimizer
+0.002552: process 1: waiting for data...
+0.000692: process 2: received data...
+0.000792: process 0: registering problem
+0.002637: process 1: received data...
+0.002630: process 3: received data...
+0.000836: evaluating objective and gradient at 0.053984 , 0.512098 , 0.201306 , -0.929942 , -0.141842 , 0.893759
+0.000870: process 2: continuing
+0.002715: process 3: continuing
+0.002736: process 3: evaluating objective and gradient at 0.053984 , 0.512098 , 0.201306 , -0.929942 , -0.141842 , 0.893759
+0.002719: process 1: continuing
+0.002740: process 1: evaluating objective and gradient at 0.053984 , 0.512098 , 0.201306 , -0.929942 , -0.141842 , 0.893759
+0.000899: process 2: evaluating objective and gradient at 0.053984 , 0.512098 , 0.201306 , -0.929942 , -0.141842 , 0.893759
