@@ -374,12 +374,15 @@ int main( int argc , char * argv[] )
 		}
 #endif
 
+		// initial condition
+		double * x0 = ( double * )malloc( params.Nvars * sizeof( double ) );
+		for( i = 0 ; i < params.Nvars ; i++ ) { x0[i] = 2.0 * urand() - 1.0; }
 
 		// do a "standard" regression with the GSL tools
 		gsl_ols( &params );
 
 		// do a "serial" minimization, exactly what we do below but without distributing the objective
-		gsl_minimize( &params );
+		gsl_minimize( &params , x0 );
 
 
 		// initial barrier, basically separating the data simulation from the solve attempt
@@ -430,11 +433,9 @@ int main( int argc , char * argv[] )
 		gsl_vector * ss = gsl_vector_alloc( params.Nvars );
 		gsl_vector_set_all( ss , 1.0 );
 
-		// initial point (random guess)
+		// initial point (random guess, but the same as possibly used above)
 		gsl_vector * x = gsl_vector_alloc( params.Nvars );
-		for( i = 0 ; i < params.Nvars ; i++ ) {
-			gsl_vector_set( x , i , 2.0 * urand() - 1.0 );
-		}
+		for( i = 0 ; i < params.Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
 
 #ifdef _GSLREGRESS_VERBOSE
 		printf( "%0.6f: process %i: registering problem\n" , MPI_Wtime()-start , p );
