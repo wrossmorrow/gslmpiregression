@@ -135,8 +135,8 @@ void subproblem_gradient_only( const double * x , gls_ols_params * p )
 	}
 
 	// constant term
-	p->b[p->Nvars-1] = 0.0; 
-	for( k = 0 ; k < p->Ncols ; k++ ) { p->b[p->Nvars-1] += p->r[k]; }
+	p->b[p->Nfeat] = 0.0; 
+	for( k = 0 ; k < p->Ncols ; k++ ) { p->b[p->Nfeat] += p->r[k]; }
 
 }
 
@@ -166,8 +166,8 @@ void subproblem_objective_and_gradient( const double * x , gls_ols_params * p )
 	}
 
 	// constant term
-	p->b[p->Nvars-1] = 0.0; 
-	for( k = 0 ; k < p->Ncols ; k++ ) { p->b[p->Nvars-1] += p->r[k]; }
+	p->b[p->Nfeat] = 0.0; 
+	for( k = 0 ; k < p->Ncols ; k++ ) { p->b[p->Nfeat] += p->r[k]; }
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -641,11 +641,13 @@ int main( int argc , char * argv[] )
 			// get variables
 			MPI_Bcast( (void*)(params.x) , params.Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
 
+/*
 #ifdef _GSLREGRESS_VERBOSE
 			printf( "%0.6f: process %i: evaluating %s at %0.6f" , MPI_Wtime()-start , p , EVAL_TYPE(status) , params.x[0] );
 			for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.6f" , params.x[i] ); }
 			printf( "\n" );
 #endif
+*/
 
 			switch( status ) {
 				case 1 : // objective only
