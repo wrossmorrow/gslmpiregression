@@ -174,10 +174,10 @@ void gsl_ols( gls_ols_params * params )
 	gsl_vector * c = gsl_vector_alloc( params->Nvars );
 	gsl_matrix * S = gsl_matrix_alloc( params->Nvars , params->Nvars );
 	for( n = 0 ; n < params->Nobsv ; n++ ) {
-		for( i = 0 ; i < K ; i++ ) {
+		for( i = 0 ; i < params->Nfeat-1 ; i++ ) {
 			gsl_matrix_set( X , n , i , params->data[ n * params->Nvars + i ] );
 		}
-		gsl_matrix_set( X , n , K , 1.0 );
+		gsl_matrix_set( X , n , params->Nfeat-1 , 1.0 );
 		gsl_vector_set( y , i , params->data[ n * params->Nvars + K ] );
 	}
 	gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( N , params->Nvars );
@@ -206,7 +206,8 @@ void gsl_ols( gls_ols_params * params )
 
 void gsl_minimize( gls_ols_params * params , const double * x0 ) 
 {
-	
+	int i;
+
 	// minimizer object
 	const gsl_multimin_fminimizer_type * T = gsl_multimin_fminimizer_nmsimplex2;
 	gsl_multimin_fminimizer * s = gsl_multimin_fminimizer_alloc( T , params->Nvars );
@@ -229,7 +230,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 	gsl_multimin_fminimizer_set( s , &sos , x , ss );
 
 	// iterations
-	status = GSL_CONTINUE;
+	int status = GSL_CONTINUE;
 	int iter = 0; 
 	double size;
 	do {
@@ -246,11 +247,11 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 	} while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
 
 	// only non-verbose print
-	printf( "%0.6f: process %i: real coefficients: %0.2f" , MPI_Wtime()-start , p , coeffs[0] );
-	for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , coeffs[i] ); }
+	printf( "%0.6f: real coefficients: %0.2f" , MPI_Wtime()-start , coeffs[0] );
+	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.2f" , coeffs[i] ); }
 	printf( "\n" );
-	printf( "%0.6f: process %i: estimated coeffs: %0.2f" , MPI_Wtime()-start , p , ((s->x)->data)[0] );
-	for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , ((s->x)->data)[i] ); }
+	printf( "%0.6f: estimated coeffs: %0.2f" , MPI_Wtime()-start , gsl_vector_get( s->x , 0 ) );
+	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.2f" , gsl_vector_get( s->x , i ) ); }
 	printf( "\n" );
 
 	// clean up after optimizer
