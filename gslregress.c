@@ -415,9 +415,11 @@ int main( int argc , char * argv[] )
 		double * x0 = ( double * )malloc( params.Nvars * sizeof( double ) );
 		for( i = 0 ; i < params.Nvars ; i++ ) { x0[i] = 2.0 * urand() - 1.0; }
 
-
 		// do a "standard" regression with the GSL tools
+		method_start = MPI_Wtime();
+		printf( "%0.6f: GSL Multimin Estimation...\n" , MPI_Wtime()-start );
 		gsl_ols( &params , NULL );
+		printf( "%0.6f:   took %0.6fs (don't compare to others)\n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
 
 		method_start = MPI_Wtime();
 		printf( "%0.6f: GSL Multimin Estimation...\n" , MPI_Wtime()-start );
