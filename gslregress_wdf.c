@@ -413,6 +413,7 @@ int main( int argc , char * argv[] )
 			params.data[ n * params.Nvars + K ] += 2.0 * urand() - 1.0; // plus error
 		}
 
+/*
 #ifdef _GSLREGRESS_VERBOSE
 		printf( "%0.6f: all data: \n" , MPI_Wtime()-start );
 		for( n = 0 ; n < N ; n++ ) {
@@ -423,6 +424,7 @@ int main( int argc , char * argv[] )
 			printf( "\n" );
 		}
 #endif
+*/
 
 		// initial barrier
 		MPI_Barrier( MPI_COMM_WORLD );
