@@ -158,6 +158,112 @@ double distributed_objective( const gsl_vector * x , void * params )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * 
+ * STANDARD (UNWEIGHTED) ORDINARY LEAST SQUARES
+ * 
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+void gsl_ols( gls_ols_params * params ) 
+{
+
+	int i , n;
+	double chisq = 0.0;
+	gsl_matrix * X = gsl_matrix_alloc( params->Nobsv , params->Nvars );
+	gsl_vector * y = gsl_vector_alloc( params->Nobsv );
+	gsl_vector * c = gsl_vector_alloc( params->Nvars );
+	gsl_matrix * S = gsl_matrix_alloc( params->Nvars , params->Nvars );
+	for( n = 0 ; n < params->Nobsv ; n++ ) {
+		for( i = 0 ; i < K ; i++ ) {
+			gsl_matrix_set( X , n , i , params->data[ n * params->Nvars + i ] );
+		}
+		gsl_matrix_set( X , n , K , 1.0 );
+		gsl_vector_set( y , i , params->data[ n * params->Nvars + K ] );
+	}
+	gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( N , params->Nvars );
+	gsl_multifit_linear( X , y , c , S , &chisq , ols );
+	gsl_multifit_linear_free( ols );
+	gsl_matrix_free( X );
+	gsl_vector_free( y );
+	gsl_matrix_free( S );
+
+	printf( "%0.6f: OLS estimates: %0.2f" , MPI_Wtime()-start , gsl_vector_get( c , 0 ) );
+	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.2f" , gsl_vector_get( c , i ) ); }
+	printf( "\n" );
+	gsl_vector_free( c );
+
+}
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * 
+ * NON-DISTRIBUTED OPTIMIZATION
+ * 
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+void gsl_minimize( gls_ols_params * params , const double * x0 ) 
+{
+	
+	// minimizer object
+	const gsl_multimin_fminimizer_type * T = gsl_multimin_fminimizer_nmsimplex2;
+	gsl_multimin_fminimizer * s = gsl_multimin_fminimizer_alloc( T , params->Nvars );
+
+	// evaluation function
+	gsl_multimin_function sos;
+	sos.n = params.Nvars; // features and constant
+	sos.f = &non_distributed_objective; // defined elsewhere
+	sos.params = (void*)params; // we'll pass the data object, allocated here, to objective evaluations
+
+	// step size
+	gsl_vector * ss = gsl_vector_alloc( params->Nvars );
+	gsl_vector_set_all( ss , 1.0 );
+
+	// initial point (random guess)
+	gsl_vector * x = gsl_vector_alloc( params->Nvars );
+	for( i = 0 ; i < params->Nvars ; i++ ) { gsl_vector_set( x , i , x0 ); }
+
+	// "register" these with the minimizer
+	gsl_multimin_fminimizer_set( s , &sos , x , ss );
+
+	// iterations
+	status = GSL_CONTINUE;
+	int iter = 0; 
+	double size;
+	do {
+
+		// iterate will call the distributed objective
+		status = gsl_multimin_fminimizer_iterate( s );
+		iter++;
+
+		if( status ) { break; } // iteration failure? 
+
+		size = gsl_multimin_fminimizer_size( s );
+		status = gsl_multimin_test_size( size , GSLREGRESS_OPT_TOL );
+
+	} while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
+
+	// only non-verbose print
+	printf( "%0.6f: process %i: real coefficients: %0.2f" , MPI_Wtime()-start , p , coeffs[0] );
+	for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , coeffs[i] ); }
+	printf( "\n" );
+	printf( "%0.6f: process %i: estimated coeffs: %0.2f" , MPI_Wtime()-start , p , ((s->x)->data)[0] );
+	for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , ((s->x)->data)[i] ); }
+	printf( "\n" );
+
+	// clean up after optimizer
+	gsl_vector_free( x );
+	gsl_vector_free( ss );
+	gsl_multimin_fminimizer_free( s );
+
+}
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * 
  * EXECUTABLE ROUTINE
  * 
  * Set up MPI, all-process problem data, setup and start optimization in the root process and run loop
@@ -268,30 +374,13 @@ int main( int argc , char * argv[] )
 		}
 #endif
 
-		// do a "standard" regression with the GSL tools
-		double chisq = 0.0;
-		gsl_matrix * X = gsl_matrix_alloc( params.Nobsv , params.Nvars );
-		gsl_vector * y = gsl_vector_alloc( params.Nobsv );
-		gsl_vector * c = gsl_vector_alloc( params.Nvars );
-		gsl_matrix * S = gsl_matrix_alloc( params.Nvars , params.Nvars );
-		for( n = 0 ; n < params.Nobsv ; n++ ) {
-			for( i = 0 ; i < K ; i++ ) {
-				gsl_matrix_set( X , n , i , params.data[ n * params.Nvars + i ] );
-			}
-			gsl_matrix_set( X , n , K , 1.0 );
-			gsl_vector_set( y , i , params.data[ n * params.Nvars + K ] );
-		}
-		gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( N , params.Nvars );
-    	gsl_multifit_linear( X , y , c , S , &chisq , ols );
-    	gsl_multifit_linear_free( ols );
-    	gsl_matrix_free( X );
-    	gsl_vector_free( y );
-    	gsl_matrix_free( S );
 
-    	printf( "%0.6f: process %i: OLS estimates: %0.2f" , MPI_Wtime()-start , p , gsl_vector_get( c , 0 ) );
-		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , gsl_vector_get( c , i ) ); }
-		printf( "\n" );
-    	gsl_vector_free( c );
+		// do a "standard" regression with the GSL tools
+		gsl_ols( &params );
+
+		// do a "serial" minimization, exactly what we do below but without distributing the objective
+		gsl_minimize( &params );
+
 
 		// initial barrier, basically separating the data simulation from the solve attempt
 		MPI_Barrier( MPI_COMM_WORLD );
