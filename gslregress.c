@@ -193,10 +193,10 @@ void gsl_ols( gls_ols_params * params )
 	gsl_vector * c = gsl_vector_alloc( params->Nvars );
 	gsl_matrix * S = gsl_matrix_alloc( params->Nvars , params->Nvars );
 	for( n = 0 ; n < params->Nobsv ; n++ ) {
-		for( i = 0 ; i < params->Nfeat-1 ; i++ ) {
+		for( i = 0 ; i < params->Nfeat ; i++ ) {
 			gsl_matrix_set( X , n , i , params->data[ n * params->Nvars + i ] );
 		}
-		gsl_matrix_set( X , n , params->Nfeat-1 , 1.0 );
+		gsl_matrix_set( X , n , params->Nfeat , 1.0 );
 		gsl_vector_set( y , n , params->data[ n * params->Nvars + params->Nfeat-1 ] );
 	}
 	gsl_multifit_linear_workspace * ols = gsl_multifit_linear_alloc( params->Nobsv , params->Nvars );
