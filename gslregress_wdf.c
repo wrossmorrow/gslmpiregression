@@ -458,7 +458,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 	gsl_multimin_fdfminimizer * s = gsl_multimin_fdfminimizer_alloc( T , params->Nvars );
 
 	// evaluation function
-	gsl_multimin_function sos;
+	gsl_multimin_function_fdf sos;
 	sos.n = params->Nvars; // features and constant
 	sos.f = &non_distributed_objective_only; // defined elsewhere
 	sos.df = &non_distributed_gradient_only;
