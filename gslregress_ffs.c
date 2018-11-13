@@ -352,7 +352,6 @@ int main( int argc , char * argv[] )
 
 	// get the filename prefix to use
 	strcpy( filename_prefix , argv[3] );
-	printf( "%s\n" , filename_prefix );
 
 	R = N % P; // remainder (to spread evenly over processes)
 	B = ( N - R ) / P; // block size (even division)
@@ -408,7 +407,6 @@ int main( int argc , char * argv[] )
 		int offset = 0;
 		for( r = 0 ; r < P ; r++ ) {
 			sprintf( filename , "%s_%i.dat" , filename_prefix , r );
-			printf( "%s\n" , filename );
 			fp = fopen( filename , "wb" );
 			count  = B + ( i < R ? 1 : 0 );
 			count *= K+1;
