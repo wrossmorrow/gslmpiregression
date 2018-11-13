@@ -419,10 +419,6 @@ void optimizer_process( int P , gls_ols_params * params )
 	gsl_vector_free( ss );
 	gsl_multimin_fminimizer_free( s );
 
-	printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
-
-	free( x0 );
-
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -632,6 +628,10 @@ int main( int argc , char * argv[] )
 		method_start = MPI_Wtime();
 		printf( "%0.6f: Distributed GSL Multimin Estimation... \n" , MPI_Wtime()-start );
 
+		optimizer_process( P , &params );
+
+		/*
+
 		// initial barrier, basically separating the data simulation from the solve attempt
 		MPI_Barrier( MPI_COMM_WORLD );
 
@@ -745,6 +745,8 @@ int main( int argc , char * argv[] )
 		gsl_vector_free( x );
 		gsl_vector_free( ss );
 		gsl_multimin_fminimizer_free( s );
+
+		*/
 
 		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
 
