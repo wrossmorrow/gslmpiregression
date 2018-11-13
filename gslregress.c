@@ -585,10 +585,6 @@ int main( int argc , char * argv[] )
 				break; 
 			}
 
-#ifdef _GSLREGRESS_VERBOSE
-			printf( "%0.6f: process %i: continuing\n" , MPI_Wtime()-start , p );
-#endif
-
 			// get variables
 			MPI_Bcast( (void*)(params.x) , params.Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
 

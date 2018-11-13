@@ -457,11 +457,15 @@ int main( int argc , char * argv[] )
 
 		// read local file... like we would in any worker process
 
+#ifdef _GSLREGRESS_VERBOSE
+		printf( "%0.6f: process %i: reading data...\n" , MPI_Wtime()-start , p );
+#endif
+
 		// size the data array: we will expect to get Ncols "columns" each of length K+1 = Nvars (contiguous)
 		params.data = ( double * )malloc( ( params.Ncols * params.Nvars ) * sizeof( double ) );
 
 		// create process-specific filename, open the file, and read the data
-		sprintf( "%s_%i.dat" , filename_prefix , p , filename );
+		sprintf( filename , "%s_%i.dat" , filename_prefix , p );
 		fp = fopen( filename , "rb" );
 		fread( (void*)(params.data) , sizeof( double ) , params.Ncols * params.Nvars , fp );
 		fclose( fp );
@@ -565,7 +569,7 @@ int main( int argc , char * argv[] )
 		params.data = ( double * )malloc( ( params.Ncols * params.Nvars ) * sizeof( double ) );
 
 #ifdef _GSLREGRESS_VERBOSE
-				printf( "%0.6f: process %i: reading data...\n" , MPI_Wtime()-start , p );
+		printf( "%0.6f: process %i: reading data...\n" , MPI_Wtime()-start , p );
 #endif
 
 		// create process-specific filename, open the file, and read the data
@@ -595,10 +599,6 @@ int main( int argc , char * argv[] )
 #endif
 				break; 
 			}
-
-#ifdef _GSLREGRESS_VERBOSE
-			printf( "%0.6f: process %i: continuing\n" , MPI_Wtime()-start , p );
-#endif
 
 			// get variables
 			MPI_Bcast( (void*)(params.x) , params.Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
