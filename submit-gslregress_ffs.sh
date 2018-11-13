@@ -8,7 +8,6 @@ echo "#!/bin/bash
 #SBATCH --output=${BASE}-${1}-${2}-${3}.txt
 #
 #SBATCH --ntasks=${1}
-#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --time=05:00
 #SBATCH --mem-per-cpu=100  
