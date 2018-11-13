@@ -2,5 +2,8 @@
 *.txt
 run-*.sh
 
+/bin
+bin/*
+
 /rundata
 rundata/*
