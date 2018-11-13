@@ -389,12 +389,6 @@ int main( int argc , char * argv[] )
 		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , coeffs[i] ); }
 		printf( "\n" );
 
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: real coefficients: %0.2f" , MPI_Wtime()-start , p , coeffs[0] );
-		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.2f" , coeffs[i] ); }
-		printf( "\n" );
-#endif
-
 		// size the data array: root process will create all the data, and send it out
 		// This "mimics" a read-disperse model of smaller data problems, where the complexity 
 		// is not in the data size but in the model evaluation
@@ -413,6 +407,7 @@ int main( int argc , char * argv[] )
 		int offset = 0;
 		for( r = 0 ; r < P ; r++ ) {
 			sprintf( "%s_%i.dat" , filename_prefix , r , filename );
+			printf( "%s\n" , filename );
 			fp = fopen( filename , "wb" );
 			count  = B + ( i < R ? 1 : 0 );
 			count *= K+1;
