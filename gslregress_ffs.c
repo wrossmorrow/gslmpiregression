@@ -36,7 +36,7 @@
 #include <gsl/gsl_multimin.h>
 
 // comment out to suppress (most) messages, including data print
-// #define _GSLREGRESS_VERBOSE
+#define _GSLREGRESS_VERBOSE
 
 // optimization tolerance
 #define GSLREGRESS_OPT_TOL 1.0e-4
