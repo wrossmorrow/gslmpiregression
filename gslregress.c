@@ -305,13 +305,11 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 
 void optimizer_process( int P , int B , int R , int F , const double * x0 , gls_ols_params * params )
 {
-	int i , status;
+	int i , iter = 0 , status , * counts , * offset;
+	double size;
 
 	// initial barrier, basically separating the data simulation from the solve attempt
 	MPI_Barrier( MPI_COMM_WORLD );
-
-	int * counts;
-	int * offset;
 
 	// prepare data for scatter
 	counts = ( int * )malloc( P * sizeof( int ) );
@@ -383,8 +381,6 @@ void optimizer_process( int P , int B , int R , int F , const double * x0 , gls_
 
 	// iterations
 	status = GSL_CONTINUE;
-	int iter = 0; 
-	double size;
 	do {
 
 		// iterate will call the distributed objective
@@ -516,8 +512,6 @@ int main( int argc , char * argv[] )
 
 	int i , n , r, p , P , N , K , B , R;
 
-	int status;
-
 	double * coeffs;
 
 	double method_start;
@@ -628,23 +622,15 @@ int main( int argc , char * argv[] )
 		gsl_minimize( &params , x0 );
 		printf( "%0.6f:   took %0.6fs \n" , now() , MPI_Wtime() - method_start );
 
-		// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
-
+		// do a distributed optimization
 		method_start = MPI_Wtime();
 		printf( "%0.6f: Distributed GSL Multimin Estimation... \n" , now() );
-
-		// 
 		optimizer_process( P , B , R , K+1 , x0 , &params );
-
 		printf( "%0.6f:   took %0.6fs \n" , now() , MPI_Wtime() - method_start );
 
 		free( x0 );
 
-	} else {
-
-		worker_process( p , &params );
-
-	}
+	} else { worker_process( p , &params ); }
 
 	// cleanup local stuff
 	free( params.data );
