@@ -1,6 +1,6 @@
 #!/bin/bash
 if [[ $# -lt 3 ]] ; then exit 1; fi
-BASE=gslregress_wdf
+BASE=gslregress_ffs
 SCRIPT=run-${BASE}-${1}-${2}-${3}.sh
 echo "#!/bin/bash
 # 
@@ -24,5 +24,6 @@ GSL_INCL=\"-I/share/software/user/open/gsl/2.3/include\"
 mpicc ${BASE}.c -o ${BASE} \${GSL_LIBS} \${GSL_INCL}
 
 LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:\${GSL_SHARED_LIB} ; export LD_LIBRARY_PATH
-mpirun -np ${1} ${BASE} ${2} ${3}" > ${SCRIPT}
+mkdir -p rundata/${1}-${2}-${3}
+mpirun -np ${1} ${BASE} ${2} ${3} rundata/${1}-${2}-${3}/ffs-data" > ${SCRIPT}
 sbatch ${SCRIPT}
