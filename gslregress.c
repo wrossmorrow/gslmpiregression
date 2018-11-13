@@ -354,7 +354,7 @@ void worker_process( int p , gls_ols_params * params )
 #endif
 
 		// local evaluation, writes into params->s
-		subproblem_objective( params->x , &params );
+		subproblem_objective( params->x , params );
 
 		// sum-reduce to accumulate parts back in the root process
 		MPI_Reduce( (void*)(&(params->s)) , NULL , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
