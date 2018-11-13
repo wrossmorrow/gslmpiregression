@@ -301,7 +301,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void optimizer_process( int P , gls_ols_params * params )
+void optimizer_process( int P , int B , int R , int F , gls_ols_params * params )
 {
 	int i , status;
 
@@ -317,8 +317,7 @@ void optimizer_process( int P , gls_ols_params * params )
 
 	// root process needs all counts
 	for( i = 0 ; i < P ; i++ ) {
-		counts[i] = B + ( i < R ? 1 : 0 );
-		counts[i] *= K + 1; // multiply by regression size (K), plus one for the obseration (y)
+		counts[i] = F * ( B + ( i < R ? 1 : 0 ) );
 	}
 
 	offset[0] = 0;
@@ -402,10 +401,10 @@ void optimizer_process( int P , gls_ols_params * params )
 #endif
 
 	// only non-verbose print
-	printf( "%0.6f: estimated coeffs: %0.3f" , MPI_Wtime()-start , p , gsl_vector_get( s-> x , 0 ) );
-	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.3f" , gsl_vector_get( s-> x , i ) ); }
+	printf( "%0.6f: estimated coeffs: %0.3f" , MPI_Wtime()-start , gsl_vector_get( s->x , 0 ) );
+	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.3f" , gsl_vector_get( s->x , i ) ); }
 	printf( "\n" );
-
+	
 	// ** IMPORTANT ** 
 	//
 	// worker threads will _always_ loop back to the evaluation broadcast
@@ -628,7 +627,8 @@ int main( int argc , char * argv[] )
 		method_start = MPI_Wtime();
 		printf( "%0.6f: Distributed GSL Multimin Estimation... \n" , MPI_Wtime()-start );
 
-		optimizer_process( P , &params );
+		// 
+		optimizer_process( P , B , R , K+1 , &params );
 
 		/*
 
