@@ -352,6 +352,7 @@ int main( int argc , char * argv[] )
 
 	// get the filename prefix to use
 	strcpy( filename_prefix , argv[3] );
+	printf( "%s\n" , filename_prefix );
 
 	R = N % P; // remainder (to spread evenly over processes)
 	B = ( N - R ) / P; // block size (even division)
