@@ -407,7 +407,7 @@ int main( int argc , char * argv[] )
 		int count = 0;
 		int offset = 0;
 		for( r = 0 ; r < P ; r++ ) {
-			sprintf( "%s_%i.dat" , filename_prefix , r , filename );
+			sprintf( filename , "%s_%i.dat" , filename_prefix , r );
 			printf( "%s\n" , filename );
 			fp = fopen( filename , "wb" );
 			count  = B + ( i < R ? 1 : 0 );
@@ -569,7 +569,7 @@ int main( int argc , char * argv[] )
 #endif
 
 		// create process-specific filename, open the file, and read the data
-		sprintf( "%s_%i.dat" , filename_prefix , p , filename );
+		sprintf( filename , "%s_%i.dat" , filename_prefix , p );
 		fp = fopen( filename , "rb" );
 		fread( (void*)(params.data) , sizeof( double ) , params.Ncols * params.Nvars , fp );
 		fclose( fp );
