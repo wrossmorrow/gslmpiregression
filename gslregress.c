@@ -48,6 +48,8 @@
 // to get what is probably a sequential picture of the logs
 static double start;
 
+double now() { return MPI_Wtime() - start; }
+
 // helper function to get simple uniform random numbers
 double urand() { return ((double)rand()) / ((double)RAND_MAX); }
 
@@ -123,7 +125,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 	int evaluate = 1;
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: evaluating objective at %0.6f" , MPI_Wtime()-start , x->data[0] );
+	printf( "%0.6f: evaluating objective at %0.6f" , now() , x->data[0] );
 	for( i = 1 ; i < p->Nvars ; i++ ) { printf( " , %0.6f" , x->data[i] ); }
 	printf( "\n" );
 #endif
@@ -148,7 +150,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 	f /= ((double)(p->Nobsv));
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: obtained %0.6f...\n" , MPI_Wtime()-start , f );
+	printf( "%0.6f: obtained %0.6f...\n" , now() , f );
 #endif
 
 	return f;
@@ -194,7 +196,7 @@ void gsl_ols( gls_ols_params * params , double * ols_c )
 		}
 	}
 
-	printf( "%0.6f: GSL OLS estimates: %0.3f" , MPI_Wtime()-start , gsl_vector_get( c , 0 ) );
+	printf( "%0.6f: GSL OLS estimates: %0.3f" , now() , gsl_vector_get( c , 0 ) );
 	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.3f" , gsl_vector_get( c , i ) ); }
 	printf( "\n" );
 	gsl_vector_free( c );
@@ -278,7 +280,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 	} while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
 
 	// print out result obtained
-	printf( "%0.6f: estimated coeffs: %0.3f" , MPI_Wtime()-start , gsl_vector_get( s->x , 0 ) );
+	printf( "%0.6f: estimated coeffs: %0.3f" , now() , gsl_vector_get( s->x , 0 ) );
 	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.3f" , gsl_vector_get( s->x , i ) ); }
 	printf( "\n" );
 
@@ -301,7 +303,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void optimizer_process( int P , int B , int R , int F , gls_ols_params * params )
+void optimizer_process( int P , int B , int R , int F , const double * x0 , gls_ols_params * params )
 {
 	int i , status;
 
@@ -335,7 +337,7 @@ void optimizer_process( int P , int B , int R , int F , gls_ols_params * params 
 	// setup GSL optimizer
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: process %i: setting up GSL optimizer\n" , MPI_Wtime()-start , p );
+	printf( "%0.6f: process %i: setting up GSL optimizer\n" , now() , p );
 #endif
 
 	// minimizer object
@@ -352,12 +354,16 @@ void optimizer_process( int P , int B , int R , int F , gls_ols_params * params 
 	gsl_vector * ss = gsl_vector_alloc( params->Nvars );
 	gsl_vector_set_all( ss , 1.0 );
 
-	// initial point (random guess, but the same as possibly used above)
+	// initial point (random guess, but the same as possibly used elsewhere, if passed)
 	gsl_vector * x = gsl_vector_alloc( params->Nvars );
-	for( i = 0 ; i < params->Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
+	if( x0 == NULL ) {
+		for( i = 0 ; i < params->Nvars ; i++ ) { gsl_vector_set( x , i , 2.0 * urand() - 1.0 ); }
+	} else {
+		for( i = 0 ; i < params->Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
+	}
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: optimizer process: registering problem\n" , MPI_Wtime()-start );
+	printf( "%0.6f: optimizer process: registering problem\n" , now() );
 #endif
 
 	// "register" these with the minimizer
@@ -372,7 +378,7 @@ void optimizer_process( int P , int B , int R , int F , gls_ols_params * params 
 	// MPI_Barrier( MPI_COMM_WORLD ); 
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: optimizer process: starting iterations\n" , MPI_Wtime()-start );
+	printf( "%0.6f: optimizer process: starting iterations\n" , now() );
 #endif
 
 	// iterations
@@ -386,7 +392,7 @@ void optimizer_process( int P , int B , int R , int F , gls_ols_params * params 
 		iter++;
 
 #ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: optimizer process: iteration %i\n" , MPI_Wtime()-start , iter );
+		printf( "%0.6f: optimizer process: iteration %i\n" , now() , iter );
 #endif
 
 		if( status ) { break; } // iteration failure? 
@@ -397,11 +403,11 @@ void optimizer_process( int P , int B , int R , int F , gls_ols_params * params 
 	} while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: optimizer process: finished iterations\n" , MPI_Wtime()-start );
+	printf( "%0.6f: optimizer process: finished iterations\n" , now() );
 #endif
 
 	// only non-verbose print
-	printf( "%0.6f: estimated coeffs: %0.3f" , MPI_Wtime()-start , gsl_vector_get( s->x , 0 ) );
+	printf( "%0.6f: estimated coeffs: %0.3f" , now() , gsl_vector_get( s->x , 0 ) );
 	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.3f" , gsl_vector_get( s->x , i ) ); }
 	printf( "\n" );
 	
@@ -441,14 +447,14 @@ void worker_process( int p , gls_ols_params * params )
 	params->data = ( double * )malloc( ( params->Ncols * params->Nvars ) * sizeof( double ) );
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: process %i: waiting for data...\n" , MPI_Wtime()-start , p );
+	printf( "%0.6f: process %i: waiting for data...\n" , now() , p );
 #endif
 
 	// receiving-end scatterv, write result into "data"
 	MPI_Scatterv( NULL , NULL , NULL , MPI_DOUBLE , (void*)(params->data) , ( params->Ncols * params->Nvars ) , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: process %i: received data...\n" , MPI_Wtime()-start , p );
+	printf( "%0.6f: process %i: received data...\n" , now() , p );
 #endif
 
 	// do any local setup required with this data...
@@ -468,7 +474,7 @@ void worker_process( int p , gls_ols_params * params )
 		MPI_Bcast( (void*)(&status) , 1 , MPI_INT , 0 , MPI_COMM_WORLD );
 		if( status != 1 ) { 
 #ifdef _GSLREGRESS_VERBOSE
-			printf( "%0.6f: process %i: exiting worker loop\n" , MPI_Wtime()-start , p );
+			printf( "%0.6f: process %i: exiting worker loop\n" , now() , p );
 #endif
 			break; 
 		}
@@ -477,7 +483,7 @@ void worker_process( int p , gls_ols_params * params )
 		MPI_Bcast( (void*)(params->x) , params->Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
 
 #ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i evaluating at %0.6f" , MPI_Wtime()-start , p , params->x[0] );
+		printf( "%0.6f: process %i evaluating at %0.6f" , now() , p , params->x[0] );
 		for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.6f" , params->x[i] ); }
 		printf( "\n" );
 #endif
@@ -557,9 +563,9 @@ int main( int argc , char * argv[] )
 	params.Ncols = B + ( p < R ? 1 : 0 );
 
 #ifdef _GSLREGRESS_VERBOSE
-	printf( "%0.6f: process %i: number of variables... %i\n" , MPI_Wtime()-start , p , params.Nvars );
-	printf( "%0.6f: process %i: number of features.... %i\n" , MPI_Wtime()-start , p , params.Nfeat );
-	printf( "%0.6f: process %i: number of columns..... %i\n" , MPI_Wtime()-start , p , params.Ncols );
+	printf( "%0.6f: process %i: number of variables... %i\n" , now() , p , params.Nvars );
+	printf( "%0.6f: process %i: number of features.... %i\n" , now() , p , params.Nfeat );
+	printf( "%0.6f: process %i: number of columns..... %i\n" , now() , p , params.Ncols );
 #endif
 
 	// variables
@@ -578,7 +584,7 @@ int main( int argc , char * argv[] )
 		coeffs = ( double * )malloc( params.Nvars * sizeof( double ) );
 		for( i = 0 ; i < params.Nvars ; i++ ) { coeffs[i] = urand(); }
 
-		printf( "%0.6f: real coefficients: %0.3f" , MPI_Wtime()-start , p , coeffs[0] );
+		printf( "%0.6f: real coefficients: %0.3f" , now() , p , coeffs[0] );
 		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , coeffs[i] ); }
 		printf( "\n" );
 
@@ -596,9 +602,9 @@ int main( int argc , char * argv[] )
 		}
 
 #ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: all data: \n" , MPI_Wtime()-start );
+		printf( "%0.6f: all data: \n" , now() );
 		for( n = 0 ; n < N ; n++ ) {
-			printf( "%0.6f:  column %i: %0.2f" , MPI_Wtime()-start , n , params.data[n*(K+1)+0] );
+			printf( "%0.6f:  column %i: %0.2f" , now() , n , params.data[n*(K+1)+0] );
 			for( i = 1 ; i <= K ; i++ ) {
 				printf( ", %0.2f" , params.data[n*(K+1)+i] );
 			}
@@ -612,143 +618,25 @@ int main( int argc , char * argv[] )
 
 		// do a "standard" regression with the GSL tools
 		method_start = MPI_Wtime();
-		printf( "%0.6f: GSL OLS Regression...\n" , MPI_Wtime()-start );
+		printf( "%0.6f: GSL OLS Regression...\n" , now() );
 		gsl_ols( &params , NULL );
-		printf( "%0.6f:   took %0.6fs (don't compare to others)\n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
+		printf( "%0.6f:   took %0.6fs (don't compare to others)\n" , now() , MPI_Wtime() - method_start );
 
 		// do a "serial" minimization, exactly what we do below but without distributing the objective
 		method_start = MPI_Wtime();
-		printf( "%0.6f: Serial GSL Multimin Estimation...\n" , MPI_Wtime()-start );
+		printf( "%0.6f: Serial GSL Multimin Estimation...\n" , now() );
 		gsl_minimize( &params , x0 );
-		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
+		printf( "%0.6f:   took %0.6fs \n" , now() , MPI_Wtime() - method_start );
 
 		// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
 		method_start = MPI_Wtime();
-		printf( "%0.6f: Distributed GSL Multimin Estimation... \n" , MPI_Wtime()-start );
+		printf( "%0.6f: Distributed GSL Multimin Estimation... \n" , now() );
 
 		// 
-		optimizer_process( P , B , R , K+1 , &params );
+		optimizer_process( P , B , R , K+1 , x0 , &params );
 
-		/*
-
-		// initial barrier, basically separating the data simulation from the solve attempt
-		MPI_Barrier( MPI_COMM_WORLD );
-
-		int * counts;
-		int * offset;
-
-		// prepare data for scatter
-		counts = ( int * )malloc( P * sizeof( int ) );
-		offset = ( int * )malloc( P * sizeof( int ) );
-
-		// root process needs all counts
-		for( i = 0 ; i < P ; i++ ) {
-			counts[i] = B + ( i < R ? 1 : 0 );
-			counts[i] *= K + 1; // multiply by regression size (K), plus one for the obseration (y)
-		}
-
-		offset[0] = 0;
-		for( i = 1 ; i < P ; i++ ) {
-			offset[i] = offset[i-1] + counts[i-1];
-		}
-
-		// sending-end scatterv, send from "data"
-		MPI_Scatterv( (void*)(params.data) , counts , offset , MPI_DOUBLE , NULL , 0 , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
-
-		// free scatterv data after send (should we save this for later?)
-		free( counts );
-		free( offset );
-
-		// setup GSL optimizer
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: setting up GSL optimizer\n" , MPI_Wtime()-start , p );
-#endif
-
-		// minimizer object
-		const gsl_multimin_fminimizer_type * T = gsl_multimin_fminimizer_nmsimplex2;
-		gsl_multimin_fminimizer * s = gsl_multimin_fminimizer_alloc( T , params.Nvars );
-
-		// evaluation function
-		gsl_multimin_function sos;
-		sos.n = params.Nvars; // features and constant
-		sos.f = &distributed_objective; // defined elsewhere
-		sos.params = (void*)(&params); // we'll pass the data object, allocated here, to objective evaluations
-
-		// step size
-		gsl_vector * ss = gsl_vector_alloc( params.Nvars );
-		gsl_vector_set_all( ss , 1.0 );
-
-		// initial point (random guess, but the same as possibly used above)
-		gsl_vector * x = gsl_vector_alloc( params.Nvars );
-		for( i = 0 ; i < params.Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: registering problem\n" , MPI_Wtime()-start , p );
-#endif
-
-		// "register" these with the minimizer
-		gsl_multimin_fminimizer_set( s , &sos , x , ss );
-
-		// synchronize before starting iterations
-		// 
-		// NOTE: This is a ** BAD ** idea. This deadlocks the code with GSL, at least. 
-		// When we "register" the function calls, GSL will call them (the objective at least). 
-		// If we expect to wait until iterations start with this synchronization, we deadlock. 
-		// 
-		// MPI_Barrier( MPI_COMM_WORLD ); 
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: starting iterations\n" , MPI_Wtime()-start , p );
-#endif
-
-		// iterations
-		status = GSL_CONTINUE;
-		int iter = 0; 
-		double size;
-		do {
-
-			// iterate will call the distributed objective
-			status = gsl_multimin_fminimizer_iterate( s );
-			iter++;
-
-#ifdef _GSLREGRESS_VERBOSE
-			printf( "%0.6f: process %i: iteration %i\n" , MPI_Wtime()-start , p , iter );
-#endif
-
-			if( status ) { break; } // iteration failure? 
-
-			size = gsl_multimin_fminimizer_size( s );
-			status = gsl_multimin_test_size( size , GSLREGRESS_OPT_TOL );
-
-		} while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: finished iterations\n" , MPI_Wtime()-start , p );
-#endif
-
-		// only non-verbose print
-		printf( "%0.6f: estimated coeffs: %0.3f" , MPI_Wtime()-start , p , ((s->x)->data)[0] );
-		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , ((s->x)->data)[i] ); }
-		printf( "\n" );
-
-		// ** IMPORTANT ** 
-		//
-		// worker threads will _always_ loop back to the evaluation broadcast
-		// so we have to signal them that we're done. 
-
-		status = 0;
-		MPI_Bcast( (void*)(&status) , 1 , MPI_INT , 0 , MPI_COMM_WORLD );
-
-		// clean up after optimizer
-		gsl_vector_free( x );
-		gsl_vector_free( ss );
-		gsl_multimin_fminimizer_free( s );
-
-		*/
-
-		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
+		printf( "%0.6f:   took %0.6fs \n" , now() , MPI_Wtime() - method_start );
 
 		free( x0 );
 
