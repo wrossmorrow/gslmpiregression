@@ -301,7 +301,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void optimizer_process( int P , gsl_ols_params * params )
+void optimizer_process( int P , gls_ols_params * params )
 {
 	int i , status;
 
