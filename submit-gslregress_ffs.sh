@@ -33,4 +33,4 @@ if [[ $? -ne 0 ]] ; then exit 1; fi
 LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:\${GSL_SHARED_LIB} ; export LD_LIBRARY_PATH
 mkdir -p rundata/${1}-${2}-${3}
 mpirun -np ${1} bin/${BASE} ${2} ${3} rundir/${1}-${2}-${3}" > ${SCRIPT}
-sbatch ${SCRIPT}
+sbatch -p fmcnich ${SCRIPT}
