@@ -70,7 +70,7 @@ double urand() { return ((double)rand()) / ((double)RAND_MAX); }
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-typedef struct gls_ols_params {
+typedef struct gsl_ols_params {
 	int Nobsv;
 	int Nvars;
 	int Nfeat;
@@ -79,7 +79,7 @@ typedef struct gls_ols_params {
 	double * x;
 	double * r; // Ncols-length array for residuals
 	double * b; // buffer... holds s and ds together here, ds in b[0,Ncols) and s in b[Ncols]
-} gls_ols_params;
+} gsl_ols_params;
 
 // this is a global buffer to facilitate objective-and-gradient reduction
 static double * buffer;
@@ -96,7 +96,7 @@ static double * buffer;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void subproblem_objective_only( const double * x , gls_ols_params * p )
+void subproblem_objective_only( const double * x , gsl_ols_params * p )
 {
 	int i , k;
 
@@ -112,7 +112,7 @@ void subproblem_objective_only( const double * x , gls_ols_params * p )
 	p->b[p->Nvars] /= 2.0; // absorb typical factor-of-two normalization in OLS
 }
 
-void subproblem_gradient_only( const double * x , gls_ols_params * p )
+void subproblem_gradient_only( const double * x , gsl_ols_params * p )
 {
 	int i , k;
 
@@ -140,7 +140,7 @@ void subproblem_gradient_only( const double * x , gls_ols_params * p )
 
 }
 
-void subproblem_objective_and_gradient( const double * x , gls_ols_params * p )
+void subproblem_objective_and_gradient( const double * x , gsl_ols_params * p )
 {
 	int i , k;
 
@@ -192,7 +192,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 {
 	int i;
 	double f;
-	gls_ols_params * p = ( gls_ols_params * )params;
+	gsl_ols_params * p = ( gsl_ols_params * )params;
 	int evaluate = 1; // code for this type of evaluation
 
 #ifdef _GSLREGRESS_VERBOSE
@@ -200,7 +200,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 	for( i = 1 ; i < p->Nvars ; i++ ) { printf( " , %0.6f" , x->data[i] ); }
 	printf( "\n" );
 #endif
-
+	
 	if( x->stride != 1 ) { // hopefully... 
 		printf( "only built to handle unit-stride vectors right now...\n" );
 		return GSL_NAN;
@@ -212,7 +212,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 	// send variables
 	MPI_Bcast( (void*)(x->data) , p->Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
 
-	// local evaluation (sum written into last element of buffer)
+	// local evaluation (gradient written into p->b)
 	subproblem_objective_only( x->data , p );
 
 	// reduction step
@@ -231,7 +231,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 void distributed_gradient( const gsl_vector * x , void * params , gsl_vector * g )
 {
 	int i;
-	gls_ols_params * p = ( gls_ols_params * )params;
+	gsl_ols_params * p = ( gsl_ols_params * )params;
 	int evaluate = 2; // code for this type of evaluation
 
 #ifdef _GSLREGRESS_VERBOSE
@@ -268,7 +268,7 @@ void distributed_gradient( const gsl_vector * x , void * params , gsl_vector * g
 void distributed_objective_and_gradient( const gsl_vector * x , void * params , double * f , gsl_vector * g )
 {
 	int i;
-	gls_ols_params * p = ( gls_ols_params * )params;
+	gsl_ols_params * p = ( gsl_ols_params * )params;
 	int evaluate = 3; // code for this type of evaluation
 
 #ifdef _GSLREGRESS_VERBOSE
@@ -318,7 +318,7 @@ void distributed_objective_and_gradient( const gsl_vector * x , void * params , 
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void gsl_ols( gls_ols_params * params , double * ols_c ) 
+void gsl_ols( gsl_ols_params * params , double * ols_c ) 
 {
 
 	int i , n;
@@ -371,7 +371,7 @@ double non_distributed_objective_only( const gsl_vector * x , void * params )
 {
 	int i , k;
 	double f;
-	gls_ols_params * p = ( gls_ols_params * )params;
+	gsl_ols_params * p = ( gsl_ols_params * )params;
 
 	// compute the residuals from the data and coefficients
 	f = 0.0;
@@ -389,7 +389,7 @@ double non_distributed_objective_only( const gsl_vector * x , void * params )
 void non_distributed_gradient_only( const gsl_vector * x , void * params , gsl_vector * g )
 {
 	int i , k;
-	gls_ols_params * p = ( gls_ols_params * )params;
+	gsl_ols_params * p = ( gsl_ols_params * )params;
 
 	// compute the residuals from the data and coefficients
 	for( i = 0 ; i < p->Nobsv ; i++ ) { 
@@ -417,7 +417,7 @@ void non_distributed_gradient_only( const gsl_vector * x , void * params , gsl_v
 void non_distributed_objective_and_gradient( const gsl_vector * x , void * params , double * f , gsl_vector * g )
 {
 	int i , k;
-	gls_ols_params * p = ( gls_ols_params * )params;
+	gsl_ols_params * p = ( gsl_ols_params * )params;
 
 	// compute the residuals from the data and coefficients
 	f[0] = 0.0;
@@ -446,7 +446,7 @@ void non_distributed_objective_and_gradient( const gsl_vector * x , void * param
 
 }
 
-void gsl_minimize( gls_ols_params * params , const double * x0 ) 
+void gsl_minimize( gsl_ols_params * params , const double * x0 ) 
 {
 	int i;
 
@@ -530,7 +530,7 @@ int main( int argc , char * argv[] )
 	double method_start;
 
 	// here we create a parameters structure for our use
-	gls_ols_params params;
+	gsl_ols_params params;
 
 	// seed random number generator
 	srand( time(NULL) );

@@ -28,6 +28,7 @@ MPI_INCL=\$( mpicc -showme:compile )
 MPI_LIBS=\$( mpicc -showme:link )
 
 icc ${BASE}.c -o bin/${BASE} \${CFLAGS} \${MPI_INCL} \${GSL_INCL} \${MPI_LIBS} \${GSL_LIBS}
+if [[ $? -ne 0 ]] ; then exit 1; done
 
 LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:\${GSL_SHARED_LIB} ; export LD_LIBRARY_PATH
 mkdir -p rundata/${1}-${2}-${3}

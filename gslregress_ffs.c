@@ -66,7 +66,7 @@ double urand() { return ((double)rand()) / ((double)RAND_MAX); }
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-typedef struct gls_ols_params {
+typedef struct gsl_ols_params {
 	int Nobsv;
 	int Nvars;
 	int Nfeat;
@@ -75,7 +75,7 @@ typedef struct gls_ols_params {
 	double * x;
 	double * r;
 	double s;
-} gls_ols_params;
+} gsl_ols_params;
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -89,7 +89,7 @@ typedef struct gls_ols_params {
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void subproblem_objective( const double * x , gls_ols_params * p )
+void subproblem_objective( const double * x , gsl_ols_params * p )
 {
 	int i , k;
 
@@ -122,7 +122,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 {
 	int i;
 	double f;
-	gls_ols_params * p = ( gls_ols_params * )params;
+	gsl_ols_params * p = ( gsl_ols_params * )params;
 	int evaluate = 1;
 
 #ifdef _GSLREGRESS_VERBOSE
@@ -167,7 +167,7 @@ double distributed_objective( const gsl_vector * x , void * params )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void gsl_ols( gls_ols_params * params , double * ols_c ) 
+void gsl_ols( gsl_ols_params * params , double * ols_c ) 
 {
 
 	int i , n;
@@ -220,7 +220,7 @@ double non_distributed_objective( const gsl_vector * x , void * params )
 {
 	int i , k;
 	double f;
-	gls_ols_params * p = ( gls_ols_params * )params;
+	gsl_ols_params * p = ( gsl_ols_params * )params;
 
 	// compute the residuals from the data and coefficients
 	f = 0.0;
@@ -235,7 +235,7 @@ double non_distributed_objective( const gsl_vector * x , void * params )
 	return f;
 }
 
-void gsl_minimize( gls_ols_params * params , const double * x0 ) 
+void gsl_minimize( gsl_ols_params * params , const double * x0 ) 
 {
 	int i;
 
@@ -304,7 +304,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void optimizer_process( int P , int B , int R , int F , char * prefix , const double * x0 , gls_ols_params * params )
+void optimizer_process( int P , int B , int R , int F , char * prefix , const double * x0 , gsl_ols_params * params )
 {
 	FILE * fp;
 	char filename[1024];
@@ -349,7 +349,11 @@ void optimizer_process( int P , int B , int R , int F , char * prefix , const do
 
 	// initial point (random guess, but the same as possibly used above)
 	gsl_vector * x = gsl_vector_alloc( params->Nvars );
-	for( i = 0 ; i < params->Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
+	if( x0 == NULL ) {
+		for( i = 0 ; i < params->Nvars ; i++ ) { gsl_vector_set( x , i , 2.0 * urand() - 1.0 ); }
+	} else {
+		for( i = 0 ; i < params->Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
+	}
 
 #ifdef _GSLREGRESS_VERBOSE
 	printf( "%0.6f: optimizer process: registering problem\n" , now() );
@@ -423,7 +427,7 @@ void optimizer_process( int P , int B , int R , int F , char * prefix , const do
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void worker_process( int p , char * prefix , gls_ols_params * params )
+void worker_process( int p , char * prefix , gsl_ols_params * params )
 {
 	FILE * fp;
 	char filename[1024];
@@ -512,7 +516,7 @@ int main( int argc , char * argv[] )
 	char filename[1024];
 
 	// here we create a parameters structure for our use
-	gls_ols_params params;
+	gsl_ols_params params;
 
 	// seed random number generator
 	srand( time(NULL) );
@@ -607,11 +611,11 @@ int main( int argc , char * argv[] )
 		printf( "%0.6f: wrote data\n" , now() );
 #endif
 
+		/*
 		// initial condition
 		double * x0 = ( double * )malloc( params.Nvars * sizeof( double ) );
 		for( i = 0 ; i < params.Nvars ; i++ ) { x0[i] = 2.0 * urand() - 1.0; }
 
-		/*
 		// do a "standard" regression with the GSL tools
 		method_start = MPI_Wtime();
 		printf( "%0.6f: GSL OLS Regression...\n" , now() );
@@ -623,7 +627,6 @@ int main( int argc , char * argv[] )
 		printf( "%0.6f: Serial GSL Multimin Estimation...\n" , now() );
 		gsl_minimize( &params , x0 );
 		printf( "%0.6f:   took %0.6fs \n" , now() , MPI_Wtime() - method_start );
-		*/
 
 		// do a distributed optimization
 		method_start = MPI_Wtime();
@@ -632,6 +635,13 @@ int main( int argc , char * argv[] )
 		printf( "%0.6f:   took %0.6fs \n" , now() , MPI_Wtime() - method_start );
 
 		free( x0 );
+		*/
+
+		// do a distributed optimization
+		method_start = MPI_Wtime();
+		printf( "%0.6f: Distributed GSL Multimin Estimation... \n" , now() );
+		optimizer_process( P , B , R , K+1 , filename_prefix , NULL , &params );
+		printf( "%0.6f:   took %0.6fs \n" , now() , MPI_Wtime() - method_start );
 
 	} else { worker_process( p , filename_prefix , &params ); }
 

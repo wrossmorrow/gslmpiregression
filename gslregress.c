@@ -65,7 +65,7 @@ double urand() { return ((double)rand()) / ((double)RAND_MAX); }
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-typedef struct gls_ols_params {
+typedef struct gsl_ols_params {
 	int Nobsv;
 	int Nvars;
 	int Nfeat;
@@ -74,7 +74,7 @@ typedef struct gls_ols_params {
 	double * x;
 	double * r;
 	double s;
-} gls_ols_params;
+} gsl_ols_params;
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -88,7 +88,7 @@ typedef struct gls_ols_params {
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void subproblem_objective( const double * x , gls_ols_params * p )
+void subproblem_objective( const double * x , gsl_ols_params * p )
 {
 	int i , k;
 
@@ -121,7 +121,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 {
 	int i;
 	double f;
-	gls_ols_params * p = ( gls_ols_params * )params;
+	gsl_ols_params * p = ( gsl_ols_params * )params;
 	int evaluate = 1;
 
 #ifdef _GSLREGRESS_VERBOSE
@@ -130,18 +130,18 @@ double distributed_objective( const gsl_vector * x , void * params )
 	printf( "\n" );
 #endif
 
-	if( x->stride != 1 ) { // hopefully... 
-		return NAN;
-	}
-	
 	// send the evaluate flag, to tell worker processes what to do
 	MPI_Bcast( (void*)(&evaluate) , 1 , MPI_INT , 0 , MPI_COMM_WORLD );
 
-	// send variables
-	MPI_Bcast( (void*)(x->data) , p->Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
-
-	// local evaluation
-	subproblem_objective( x->data , p );
+	// send variables, and local evaluation
+	if( x->stride == 1 ) { // hopefully... 
+		MPI_Bcast( (void*)(x->data) , p->Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
+		subproblem_objective( x->data , p );
+	} else { // collapse stride
+		for( i = 0 ; i < p->Nvars ; i++ ) { p->x[i] = gsl_vector_get( x , i ); }
+		MPI_Bcast( (void*)(p->x) , p->Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
+		subproblem_objective( p->x , p );
+	}
 
 	// reduction step
 	MPI_Reduce( (void*)(&(p->s)) , &f , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
@@ -166,7 +166,7 @@ double distributed_objective( const gsl_vector * x , void * params )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void gsl_ols( gls_ols_params * params , double * ols_c ) 
+void gsl_ols( gsl_ols_params * params , double * ols_c ) 
 {
 
 	int i , n;
@@ -219,7 +219,7 @@ double non_distributed_objective( const gsl_vector * x , void * params )
 {
 	int i , k;
 	double f;
-	gls_ols_params * p = ( gls_ols_params * )params;
+	gsl_ols_params * p = ( gsl_ols_params * )params;
 
 	// compute the residuals from the data and coefficients
 	f = 0.0;
@@ -234,7 +234,7 @@ double non_distributed_objective( const gsl_vector * x , void * params )
 	return f;
 }
 
-void gsl_minimize( gls_ols_params * params , const double * x0 ) 
+void gsl_minimize( gsl_ols_params * params , const double * x0 ) 
 {
 	int i;
 
@@ -303,7 +303,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void optimizer_process( int P , int B , int R , int F , const double * x0 , gls_ols_params * params )
+void optimizer_process( int P , int B , int R , int F , const double * x0 , gsl_ols_params * params )
 {
 	int i , iter = 0 , status , * counts , * offset;
 	double size;
@@ -432,7 +432,7 @@ void optimizer_process( int P , int B , int R , int F , const double * x0 , gls_
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void worker_process( int p , gls_ols_params * params ) 
+void worker_process( int p , gsl_ols_params * params ) 
 {
 	int i , status;
 
@@ -517,7 +517,7 @@ int main( int argc , char * argv[] )
 	double method_start;
 
 	// here we create a parameters structure for our use
-	gls_ols_params params;
+	gsl_ols_params params;
 
 	// seed random number generator
 	srand( time(NULL) );
