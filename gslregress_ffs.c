@@ -130,23 +130,23 @@ double distributed_objective( const gsl_vector * x , void * params )
 	for( i = 1 ; i < p->Nvars ; i++ ) { printf( " , %0.6f" , x->data[i] ); }
 	printf( "\n" );
 #endif
-
-	if( x->stride != 1 ) { // hopefully... 
-		return NAN;
-	}
 	
 	// send the evaluate flag, to tell worker processes what to do
 	MPI_Bcast( (void*)(&evaluate) , 1 , MPI_INT , 0 , MPI_COMM_WORLD );
 
-	// send variables
-	MPI_Bcast( (void*)(x->data) , p->Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
-
-	// local evaluation
-	subproblem_objective( x->data , p );
+	// send variables, and local evaluation
+	if( x->stride == 1 ) { // hopefully... 
+		MPI_Bcast( (void*)(x->data) , p->Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
+		subproblem_objective( x->data , p );
+	} else { // collapse stride
+		for( i = 0 ; i < p->Nvars ; i++ ) { p->x[i] = gsl_vector_get( x , i ); }
+		MPI_Bcast( (void*)(p->x) , p->Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
+		subproblem_objective( p->x , p );
+	}
 
 	// reduction step
 	MPI_Reduce( (void*)(&(p->s)) , &f , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
-
+	
 	// normalization
 	f /= ((double)(p->Nobsv));
 
