@@ -31,17 +31,7 @@
 
 #include <mpi.h>
 
-#include <gsl/gsl_multifit.h>
-#include <gsl/gsl_multimin.h>
-
-// comment out to suppress (most) messages, including data print
-// #define _GSLREGRESS_VERBOSE
-
-// optimization tolerance
-#define GSLREGRESS_OPT_TOL 1.0e-4
-
-// maximum number of iterations
-#define GSLREGRESS_MAX_ITER 1000
+#include "gslregress.h"
 
 // "start" time to peg to process start, in order to get an idea of synchronization
 // because MPI_Wtime() may not be global. With this, we can use cat ... | sort -n 
@@ -49,32 +39,6 @@
 static double start;
 
 double now() { return MPI_Wtime() - start; }
-
-// helper function to get simple uniform random numbers
-double urand() { return ((double)rand()) / ((double)RAND_MAX); }
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * 
- * PROBLEM DATA STRUCTURE
- * 
- * We use this to capture/wrap problem data we need to store. Passed through GSL's minimizer routines. 
- * 
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-typedef struct gsl_ols_params {
-	int Nobsv;
-	int Nvars;
-	int Nfeat;
-	int Ncols;
-	double * data;
-	double * x;
-	double * r;
-	double s;
-} gsl_ols_params;
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -94,12 +58,24 @@ void subproblem_objective( const double * x , gsl_ols_params * p )
 
 	// compute the residuals from the data and coefficients
 	p->s = 0.0;
+
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 	for( i = 0 ; i < p->Ncols ; i++ ) { 
-		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+
+		// intialize with the constant minus observation value
+		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ]; 
+
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 		for( k = 0 ; k < p->Nfeat ; k++ ) { 
 			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * x[ k ]; // accumulate dot product into the residual
 		}
+
 		p->s += p->r[i] * p->r[i]; // accumulate sum-of-squares
+
 	}
 	p->s /= 2.0; // absorb typical factor-of-two normalization in OLS
 }
@@ -223,8 +199,10 @@ double non_distributed_objective( const gsl_vector * x , void * params )
 
 	// compute the residuals from the data and coefficients
 	f = 0.0;
+
 	for( i = 0 ; i < p->Nobsv ; i++ ) { 
-		residuals[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+		// intialize with the constant minus observation value
+		residuals[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; 
 		for( k = 0 ; k < p->Nfeat ; k++ ) { 
 			residuals[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
 		}

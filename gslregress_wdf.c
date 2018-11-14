@@ -32,54 +32,14 @@
 
 #include <mpi.h>
 
-#include <gsl/gsl_multifit.h>
-#include <gsl/gsl_multimin.h>
-
-// comment out to suppress (most) messages, including data print
-// #define _GSLREGRESS_VERBOSE
-
-// optimization tolerance
-#define GSLREGRESS_OPT_TOL 1.0e-4
-
-// initial step size
-#define GSLREGRESS_STEP_SIZE 1.0
-
-// maximum number of iterations
-#define GSLREGRESS_MAX_ITER 1000
-
-// macro for printing
-#define EVAL_TYPE(s) ( s == 1 ? "objective" : ( s == 2 ? "gradient" : ( s == 3 ? "objective and gradient" : "unknown" ) ) )
+#include "gslregress.h"
 
 // "start" time to peg to process start, in order to get an idea of synchronization
 // because MPI_Wtime() may not be global. With this, we can use cat ... | sort -n 
 // to get what is probably a sequential picture of the logs
 static double start;
 
-// helper function to get simple uniform random numbers
-double urand() { return ((double)rand()) / ((double)RAND_MAX); }
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * 
- * PROBLEM DATA STRUCTURE
- * 
- * We use this to capture/wrap problem data we need to store. Passed through GSL's minimizer routines. 
- * 
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-typedef struct gsl_ols_params {
-	int Nobsv;
-	int Nvars;
-	int Nfeat;
-	int Ncols;
-	double * data;
-	double * x;
-	double * r; // Ncols-length array for residuals
-	double * b; // buffer... holds s and ds together here, ds in b[0,Ncols) and s in b[Ncols]
-} gsl_ols_params;
+double now() { return MPI_Wtime() - start; }
 
 // this is a global buffer to facilitate objective-and-gradient reduction
 static double * buffer;
@@ -102,12 +62,23 @@ void subproblem_objective_only( const double * x , gsl_ols_params * p )
 
 	// compute the residuals from the data and coefficients
 	p->b[p->Nvars] = 0.0;
+
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 	for( i = 0 ; i < p->Ncols ; i++ ) { 
+
 		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 		for( k = 0 ; k < p->Nfeat ; k++ ) { 
 			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * x[ k ]; // accumulate dot product into the residual
 		}
+
 		p->b[p->Nvars] += p->r[i] * p->r[i]; // accumulate sum-of-squares in the buffer
+
 	}
 	p->b[p->Nvars] /= 2.0; // absorb typical factor-of-two normalization in OLS
 }
@@ -117,8 +88,17 @@ void subproblem_gradient_only( const double * x , gsl_ols_params * p )
 	int i , k;
 
 	// compute the residuals from the data and coefficients
+
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 	for( i = 0 ; i < p->Ncols ; i++ ) { 
+
 		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 		for( k = 0 ; k < p->Nfeat ; k++ ) { 
 			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * x[ k ]; // accumulate dot product into the residual
 		}
@@ -127,11 +107,20 @@ void subproblem_gradient_only( const double * x , gsl_ols_params * p )
 	// now, compute b[0:Nvars) <- [ D , 1 ]' r = [ D' ; 1' ] r where r = [ D , 1 ] x - y
 
 	// feature terms
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 	for( k = 0 ; k < p->Nfeat ; k++ ) {
+
 		(p->b)[k] = 0.0;
+
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 		for( i = 0 ; i < p->Ncols ; i++ ) { 
 			(p->b)[k] += (p->data)[ i*(p->Nvars) + k ] * (p->r)[i];
 		}
+
 	}
 
 	// constant term
@@ -147,23 +136,43 @@ void subproblem_objective_and_gradient( const double * x , gsl_ols_params * p )
 	// compute the residuals from the data and coefficients, accumulating objective 
 	// buffer allocated to be length Nvars+1 for this
 	p->b[p->Nvars] = 0.0;
+
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 	for( i = 0 ; i < p->Ncols ; i++ ) { 
+
 		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 		for( k = 0 ; k < p->Nfeat ; k++ ) { 
 			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * x[ k ]; // accumulate dot product into the residual
 		}
+
 		p->b[p->Nvars] += p->r[i] * p->r[i]; // accumulate sum-of-squares
+
 	}
 	p->b[p->Nvars] /= 2.0; // absorb typical factor-of-two normalization in OLS
 
 	// now, compute b[0:Nvars) <- [ D , 1 ]' r = [ D' ; 1' ] r where r = [ D , 1 ] x - y
 
 	// feature terms
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 	for( i = 0 ; i < p->Nfeat ; i++ ) {
+
 		p->b[i] = 0.0;
+
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+#endif
 		for( k = 0 ; k < p->Ncols ; k++ ) { 
 			p->b[i] += p->data[ k*(p->Nvars) + i ] * p->r[k];
 		}
+
 	}
 
 	// constant term
@@ -375,10 +384,13 @@ double non_distributed_objective_only( const gsl_vector * x , void * params )
 
 	// compute the residuals from the data and coefficients
 	f = 0.0;
+
 	for( i = 0 ; i < p->Nobsv ; i++ ) { 
-		residuals[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
-		for( k = 0 ; k < p->Nfeat ; k++ ) { 
-			residuals[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
+		// intialize with the constant minus observation value
+		residuals[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; 
+		for( k = 0 ; k < p->Nfeat ; k++ ) {  
+		// accumulate dot product into the residual
+			residuals[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k );
 		}
 		f += residuals[i] * residuals[i]; // accumulate sum-of-squares
 	}
@@ -393,7 +405,8 @@ void non_distributed_gradient_only( const gsl_vector * x , void * params , gsl_v
 
 	// compute the residuals from the data and coefficients
 	for( i = 0 ; i < p->Nobsv ; i++ ) { 
-		residuals[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; // intialize with the constant minus observation value
+		// intialize with the constant minus observation value
+		residuals[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; 
 		for( k = 0 ; k < p->Nfeat ; k++ ) { 
 			residuals[ i ] += (p->data)[ i*(p->Nvars) + k ] * gsl_vector_get( x , k ); // accumulate dot product into the residual
 		}
