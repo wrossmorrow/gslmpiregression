@@ -296,6 +296,188 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * 
+ * OPTIMIZER PROCESS
+ * 
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+void optimizer_process( int P , int B , int R , int F , const double * x0 , gls_ols_params * params )
+{
+
+	// initial barrier, basically separating the data simulation from the solve attempt
+	MPI_Barrier( MPI_COMM_WORLD );
+
+	// read local file... like we would in any worker process
+
+#ifdef _GSLREGRESS_VERBOSE
+	printf( "%0.6f: optimizer process: reading data...\n" , MPI_Wtime()-start );
+#endif
+
+	// create process-specific filename, open the file, and read the data
+	sprintf( filename , "%s_%i.dat" , filename_prefix , p );
+	fp = fopen( filename , "rb" );
+	fread( (void*)(params.data) , sizeof( double ) , params.Ncols * params.Nvars , fp );
+	fclose( fp );
+
+	// setup GSL optimizer
+
+#ifdef _GSLREGRESS_VERBOSE
+	printf( "%0.6f: optimizer process: setting up GSL optimizer\n" , MPI_Wtime()-start );
+#endif
+
+	// minimizer object
+	const gsl_multimin_fminimizer_type * T = gsl_multimin_fminimizer_nmsimplex2;
+	gsl_multimin_fminimizer * s = gsl_multimin_fminimizer_alloc( T , params.Nvars );
+
+	// evaluation function
+	gsl_multimin_function sos;
+	sos.n = params.Nvars; // features and constant
+	sos.f = &distributed_objective; // defined elsewhere
+	sos.params = (void*)(&params); // we'll pass the data object, allocated here, to objective evaluations
+
+	// step size
+	gsl_vector * ss = gsl_vector_alloc( params.Nvars );
+	gsl_vector_set_all( ss , 1.0 );
+
+	// initial point (random guess, but the same as possibly used above)
+	gsl_vector * x = gsl_vector_alloc( params.Nvars );
+	for( i = 0 ; i < params.Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
+
+#ifdef _GSLREGRESS_VERBOSE
+	printf( "%0.6f: optimizer process: registering problem\n" , MPI_Wtime()-start );
+#endif
+
+	// "register" these with the minimizer
+	gsl_multimin_fminimizer_set( s , &sos , x , ss );
+
+	// synchronize before starting iterations
+	// 
+	// NOTE: This is a ** BAD ** idea. This deadlocks the code with GSL, at least. 
+	// When we "register" the function calls, GSL will call them (the objective at least). 
+	// If we expect to wait until iterations start with this synchronization, we deadlock. 
+	// 
+	// MPI_Barrier( MPI_COMM_WORLD ); 
+
+#ifdef _GSLREGRESS_VERBOSE
+	printf( "%0.6f: optimizer process: starting iterations\n" , MPI_Wtime()-start );
+#endif
+
+	// iterations
+	status = GSL_CONTINUE;
+	int iter = 0; 
+	double size;
+	do {
+
+		// iterate will call the distributed objective
+		status = gsl_multimin_fminimizer_iterate( s );
+		iter++;
+
+#ifdef _GSLREGRESS_VERBOSE
+		printf( "%0.6f: optimizer process: iteration %i\n" , MPI_Wtime()-start , iter );
+#endif
+
+		if( status ) { break; } // iteration failure? 
+
+		size = gsl_multimin_fminimizer_size( s );
+		status = gsl_multimin_test_size( size , GSLREGRESS_OPT_TOL );
+
+	} while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
+
+#ifdef _GSLREGRESS_VERBOSE
+	printf( "%0.6f: optimizer process: finished iterations\n" , MPI_Wtime()-start );
+#endif
+
+	// non-verbose print
+	printf( "%0.6f: estimated coeffs: %0.3f" , MPI_Wtime()-start , gsl_vector_get( s->x , 0 ) );
+	for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.3f" , gsl_vector_get( s->x , i ) ); }
+	printf( "\n" );
+
+	// ** IMPORTANT ** 
+	//
+	// worker threads will _always_ loop back to the evaluation broadcast
+	// so we have to signal them that we're done. 
+
+	status = 0;
+	MPI_Bcast( (void*)(&status) , 1 , MPI_INT , 0 , MPI_COMM_WORLD );
+
+	// clean up after optimizer
+	gsl_vector_free( x );
+	gsl_vector_free( ss );
+	gsl_multimin_fminimizer_free( s );
+
+}
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * 
+ * WORKER PROCESS
+ * 
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+void worker_process( int p , gls_ols_params * params )
+{
+	// initial barrier
+	MPI_Barrier( MPI_COMM_WORLD );
+
+#ifdef _GSLREGRESS_VERBOSE
+	printf( "%0.6f: process %i: reading data...\n" , MPI_Wtime()-start , p );
+#endif
+
+	// create process-specific filename, open the file, and read the data
+	sprintf( filename , "%s_%i.dat" , filename_prefix , p );
+	fp = fopen( filename , "rb" );
+	fread( (void*)(params->data) , sizeof( double ) , params->Ncols * params->Nvars , fp );
+	fclose( fp );
+
+	// do any local setup required with this data...
+
+	// synchronize before starting iterations
+	// 
+	// NOTE: This is a ** BAD ** idea. This deadlocks the code with GSL, at least. 
+	// When we "register" the function calls, GSL will call them (the objective at least). 
+	// If we expect to wait until iterations start with this synchronization, we deadlock. 
+	// 
+	// MPI_Barrier( MPI_COMM_WORLD );
+
+	// entering iteration phase... 
+	while( 1 ) {
+
+		// get status, and evaluate to see if we should continue
+		MPI_Bcast( (void*)(&status) , 1 , MPI_INT , 0 , MPI_COMM_WORLD );
+		if( status != 1 ) { 
+#ifdef _GSLREGRESS_VERBOSE
+			printf( "%0.6f: process %i: exiting worker loop\n" , MPI_Wtime()-start , p );
+#endif
+			break; 
+		}
+
+		// get variables
+		MPI_Bcast( (void*)(params->x) , params->Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
+
+#ifdef _GSLREGRESS_VERBOSE
+		printf( "%0.6f: process %i evaluating at %0.6f" , MPI_Wtime()-start , p , params->x[0] );
+		for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.6f" , params.x[i] ); }
+		printf( "\n" );
+#endif
+
+		// local evaluation, writes into params.s
+		subproblem_objective( params->x , &params );
+
+		// sum-reduce to accumulate parts back in the root process
+		MPI_Reduce( (void*)(&(params->s)) , NULL , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
+
+	}
+
+}
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * 
  * EXECUTABLE ROUTINE
  * 
  * Set up MPI, all-process problem data, setup and start optimization in the root process and run loop
@@ -378,6 +560,9 @@ int main( int argc , char * argv[] )
 	params.r = ( double * )malloc( params.Ncols * sizeof( double ) );
 	for( i = 0 ; i < params.Ncols ; i++ ) { (params.r)[i] = 0.0; }
 
+	// size the data array: we will expect to get Ncols "columns" each of length K+1 = Nvars (contiguous)
+	params.data = ( double * )malloc( ( params.Ncols * params.Nvars ) * sizeof( double ) );
+
 	// root/worker differentiation starts...
 
 	if( p == 0 ) {
@@ -390,41 +575,24 @@ int main( int argc , char * argv[] )
 		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , coeffs[i] ); }
 		printf( "\n" );
 
-		// size the data array: root process will create all the data, and send it out
-		// This "mimics" a read-disperse model of smaller data problems, where the complexity 
-		// is not in the data size but in the model evaluation
-		params.data = ( double * )malloc( ( N * params.Nvars ) * sizeof( double ) );
-		for( n = 0 ; n < N ; n++ ) {
-			params.data[ n * params.Nvars + K ] = coeffs[ K ]; // initialize with constant
-			for( i = 0 ; i < K ; i++ ) {
-				params.data[ n * params.Nvars + i ] = urand(); // random features
-				params.data[ n * params.Nvars + K ] += params.data[ n * params.Nvars + i ] * coeffs[i]; // accumulate observation
-			}
-			params.data[ n * params.Nvars + K ] += 2.0 * urand() - 1.0; // plus error
-		}
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: all data: \n" , MPI_Wtime()-start );
-		for( n = 0 ; n < N ; n++ ) {
-			printf( "%0.6f:  column %i: %0.2f" , MPI_Wtime()-start , n , params.data[n*(K+1)+0] );
-			for( i = 1 ; i <= K ; i++ ) {
-				printf( ", %0.2f" , params.data[n*(K+1)+i] );
-			}
-			printf( "\n" );
-		}
-#endif
-
 		// _write_ data for each process out to a file prefixed by CLI argument
 		int count = 0;
-		int offset = 0;
-		for( i = 0 ; i < P ; i++ ) {
-			sprintf( filename , "%s_%i.dat" , filename_prefix , i );
+		for( r = 0 ; r < P ; r++ ) {
+			sprintf( filename , "%s_%i.dat" , filename_prefix , r );
 			printf( "write to %s\n" , filename );
 			fp = fopen( filename , "wb" );
-			count = ( B + ( i < R ? 1 : 0 ) ) * ( K + 1 );
-			fwrite( params.data + offset , sizeof( double ) , count , fp );
+			count = ( B + ( r < R ? 1 : 0 ) );
+			for( n = 0 ; n < count ; n++ ) {
+				params.data[ n * params.Nvars + K ] = coeffs[ K ]; // initialize with constant
+				for( i = 0 ; i < K ; i++ ) {
+					params.data[ n * params.Nvars + i ] = urand(); // random features
+					params.data[ n * params.Nvars + K ] += params.data[ n * params.Nvars + i ] * coeffs[i]; // accumulate observation
+				}
+				params.data[ n * params.Nvars + K ] += 2.0 * urand() - 1.0; // plus error
+			}
+			count *= params.Nvars;
+			fwrite( params.data , sizeof( double ) , count , fp );
 			fclose( fp );
-			offset += count;
 		}
 
 #ifdef _GSLREGRESS_VERBOSE
@@ -447,180 +615,15 @@ int main( int argc , char * argv[] )
 		gsl_minimize( &params , x0 );
 		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
 
-		// here we can free the data to allocate it specifically for the worker-like process below
-		free( params.data );
-
-		// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
-
+		// do a distributed optimization
 		method_start = MPI_Wtime();
-		printf( "%0.6f: Distributed GSL Multimin Estimation... \n" , MPI_Wtime()-start );
-
-		// initial barrier, basically separating the data simulation from the solve attempt
-		MPI_Barrier( MPI_COMM_WORLD );
-
-		// read local file... like we would in any worker process
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: reading data...\n" , MPI_Wtime()-start , p );
-#endif
-
-		// size the data array: we will expect to get Ncols "columns" each of length K+1 = Nvars (contiguous)
-		params.data = ( double * )malloc( ( params.Ncols * params.Nvars ) * sizeof( double ) );
-
-		// create process-specific filename, open the file, and read the data
-		sprintf( filename , "%s_%i.dat" , filename_prefix , p );
-		fp = fopen( filename , "rb" );
-		fread( (void*)(params.data) , sizeof( double ) , params.Ncols * params.Nvars , fp );
-		fclose( fp );
-
-		// setup GSL optimizer
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: setting up GSL optimizer\n" , MPI_Wtime()-start , p );
-#endif
-
-		// minimizer object
-		const gsl_multimin_fminimizer_type * T = gsl_multimin_fminimizer_nmsimplex2;
-		gsl_multimin_fminimizer * s = gsl_multimin_fminimizer_alloc( T , params.Nvars );
-
-		// evaluation function
-		gsl_multimin_function sos;
-		sos.n = params.Nvars; // features and constant
-		sos.f = &distributed_objective; // defined elsewhere
-		sos.params = (void*)(&params); // we'll pass the data object, allocated here, to objective evaluations
-
-		// step size
-		gsl_vector * ss = gsl_vector_alloc( params.Nvars );
-		gsl_vector_set_all( ss , 1.0 );
-
-		// initial point (random guess, but the same as possibly used above)
-		gsl_vector * x = gsl_vector_alloc( params.Nvars );
-		for( i = 0 ; i < params.Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: registering problem\n" , MPI_Wtime()-start , p );
-#endif
-
-		// "register" these with the minimizer
-		gsl_multimin_fminimizer_set( s , &sos , x , ss );
-
-		// synchronize before starting iterations
-		// 
-		// NOTE: This is a ** BAD ** idea. This deadlocks the code with GSL, at least. 
-		// When we "register" the function calls, GSL will call them (the objective at least). 
-		// If we expect to wait until iterations start with this synchronization, we deadlock. 
-		// 
-		// MPI_Barrier( MPI_COMM_WORLD ); 
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: starting iterations\n" , MPI_Wtime()-start , p );
-#endif
-
-		// iterations
-		status = GSL_CONTINUE;
-		int iter = 0; 
-		double size;
-		do {
-
-			// iterate will call the distributed objective
-			status = gsl_multimin_fminimizer_iterate( s );
-			iter++;
-
-#ifdef _GSLREGRESS_VERBOSE
-			printf( "%0.6f: process %i: iteration %i\n" , MPI_Wtime()-start , p , iter );
-#endif
-
-			if( status ) { break; } // iteration failure? 
-
-			size = gsl_multimin_fminimizer_size( s );
-			status = gsl_multimin_test_size( size , GSLREGRESS_OPT_TOL );
-
-		} while( status == GSL_CONTINUE && iter < GSLREGRESS_MAX_ITER );
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: finished iterations\n" , MPI_Wtime()-start , p );
-#endif
-
-		// only non-verbose print
-		printf( "%0.6f: estimated coeffs: %0.3f" , MPI_Wtime()-start , ((s->x)->data)[0] );
-		for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.3f" , ((s->x)->data)[i] ); }
-		printf( "\n" );
-
-		// ** IMPORTANT ** 
-		//
-		// worker threads will _always_ loop back to the evaluation broadcast
-		// so we have to signal them that we're done. 
-
-		status = 0;
-		MPI_Bcast( (void*)(&status) , 1 , MPI_INT , 0 , MPI_COMM_WORLD );
-
-		// clean up after optimizer
-		gsl_vector_free( x );
-		gsl_vector_free( ss );
-		gsl_multimin_fminimizer_free( s );
-
-		printf( "%0.6f:   took %0.6fs \n" , MPI_Wtime()-start , MPI_Wtime() - method_start );
+		printf( "%0.6f: Distributed GSL Multimin Estimation... \n" , now() );
+		optimizer_process( P , B , R , K+1 , x0 , &params );
+		printf( "%0.6f:   took %0.6fs \n" , now() , MPI_Wtime() - method_start );
 
 		free( x0 );
 
-	} else {
-
-		// initial barrier
-		MPI_Barrier( MPI_COMM_WORLD );
-
-		// size the data array: we will expect to get Ncols "columns" each of length K+1 = Nvars (contiguous)
-		params.data = ( double * )malloc( ( params.Ncols * params.Nvars ) * sizeof( double ) );
-
-#ifdef _GSLREGRESS_VERBOSE
-		printf( "%0.6f: process %i: reading data...\n" , MPI_Wtime()-start , p );
-#endif
-
-		// create process-specific filename, open the file, and read the data
-		sprintf( filename , "%s_%i.dat" , filename_prefix , p );
-		fp = fopen( filename , "rb" );
-		fread( (void*)(params.data) , sizeof( double ) , params.Ncols * params.Nvars , fp );
-		fclose( fp );
-
-		// do any local setup required with this data...
-
-		// synchronize before starting iterations
-		// 
-		// NOTE: This is a ** BAD ** idea. This deadlocks the code with GSL, at least. 
-		// When we "register" the function calls, GSL will call them (the objective at least). 
-		// If we expect to wait until iterations start with this synchronization, we deadlock. 
-		// 
-		// MPI_Barrier( MPI_COMM_WORLD );
-
-		// entering iteration phase... 
-		while( 1 ) {
-
-			// get status, and evaluate to see if we should continue
-			MPI_Bcast( (void*)(&status) , 1 , MPI_INT , 0 , MPI_COMM_WORLD );
-			if( status != 1 ) { 
-#ifdef _GSLREGRESS_VERBOSE
-				printf( "%0.6f: process %i: exiting worker loop\n" , MPI_Wtime()-start , p );
-#endif
-				break; 
-			}
-
-			// get variables
-			MPI_Bcast( (void*)(params.x) , params.Nvars , MPI_DOUBLE , 0 , MPI_COMM_WORLD );
-
-#ifdef _GSLREGRESS_VERBOSE
-			printf( "%0.6f: process %i evaluating at %0.6f" , MPI_Wtime()-start , p , params.x[0] );
-			for( i = 1 ; i < params.Nvars ; i++ ) { printf( " , %0.6f" , params.x[i] ); }
-			printf( "\n" );
-#endif
-
-			// local evaluation, writes into params.s
-			subproblem_objective( params.x , &params );
-
-			// sum-reduce to accumulate parts back in the root process
-			MPI_Reduce( (void*)(&(params.s)) , NULL , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
-
-		}
-
-	}
+	} else { worker_process( p , &params ); }
 
 	// cleanup local stuff
 	free( params.data );
