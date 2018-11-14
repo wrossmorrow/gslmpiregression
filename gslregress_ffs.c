@@ -146,7 +146,7 @@ double distributed_objective( const gsl_vector * x , void * params )
 
 	// reduction step
 	MPI_Reduce( (void*)(&(p->s)) , &f , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
-	
+
 	// normalization
 	f /= ((double)(p->Nobsv));
 
@@ -612,6 +612,7 @@ int main( int argc , char * argv[] )
 		double * x0 = ( double * )malloc( params.Nvars * sizeof( double ) );
 		for( i = 0 ; i < params.Nvars ; i++ ) { x0[i] = 2.0 * urand() - 1.0; }
 
+		/*
 		// do a "standard" regression with the GSL tools
 		method_start = MPI_Wtime();
 		printf( "%0.6f: GSL OLS Regression...\n" , now() );
@@ -623,6 +624,7 @@ int main( int argc , char * argv[] )
 		printf( "%0.6f: Serial GSL Multimin Estimation...\n" , now() );
 		gsl_minimize( &params , x0 );
 		printf( "%0.6f:   took %0.6fs \n" , now() , MPI_Wtime() - method_start );
+		*/
 
 		// do a distributed optimization
 		method_start = MPI_Wtime();
