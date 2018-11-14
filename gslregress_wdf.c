@@ -32,14 +32,8 @@
 
 #include <mpi.h>
 
+#include "clocktimer.h"
 #include "gslregress.h"
-
-// "start" time to peg to process start, in order to get an idea of synchronization
-// because MPI_Wtime() may not be global. With this, we can use cat ... | sort -n 
-// to get what is probably a sequential picture of the logs
-static double start;
-
-double now() { return MPI_Wtime() - start; }
 
 // this is a global buffer to facilitate objective-and-gradient reduction
 static double * buffer;

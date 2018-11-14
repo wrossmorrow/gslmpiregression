@@ -23,6 +23,13 @@
 // helper function to get simple uniform random numbers
 double urand() { return ((double)rand()) / ((double)RAND_MAX); }
 
+// "start" time to peg to process start, in order to get an idea of synchronization
+// because MPI_Wtime() may not be global. With this, we can use cat ... | sort -n 
+// to get what is probably a sequential picture of the logs
+static double start;
+
+double now() { return MPI_Wtime() - start; }
+
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -44,6 +51,7 @@ typedef struct gsl_ols_params {
 	double * x;
 	double * r; // Ncols-length array for residuals
 	double * b; // buffer... holds s and ds together here, ds in b[0,Ncols) and s in b[Ncols]
+	double s;
 } gsl_ols_params;
 
 #endif

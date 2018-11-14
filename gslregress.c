@@ -31,14 +31,8 @@
 
 #include <mpi.h>
 
+#include "clocktimer.h"
 #include "gslregress.h"
-
-// "start" time to peg to process start, in order to get an idea of synchronization
-// because MPI_Wtime() may not be global. With this, we can use cat ... | sort -n 
-// to get what is probably a sequential picture of the logs
-static double start;
-
-double now() { return MPI_Wtime() - start; }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -61,23 +55,27 @@ void subproblem_objective( const double * x , gsl_ols_params * p )
 
 #ifdef _GSLREGRESS_VECTOR
 #pragma vector always
-#endif
 	for( i = 0 ; i < p->Ncols ; i++ ) { 
-
-		// intialize with the constant minus observation value
-		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ]; 
-
-#ifdef _GSLREGRESS_VECTOR
+		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ];
 #pragma vector always
-#endif
+		for( k = 0 ; k < p->Nfeat ; k++ ) { 
+			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * x[ k ];
+		}
+		p->s += p->r[i] * p->r[i];
+	}
+#else 
+	for( i = 0 ; i < p->Ncols ; i++ ) { 
+		// intialize with the constant minus observation value
+		p->r[ i ] = x[ p->Nfeat ] - p->data[ i*(p->Nvars) + p->Nfeat ];
 		for( k = 0 ; k < p->Nfeat ; k++ ) { 
 			p->r[ i ] += (p->data)[ i*(p->Nvars) + k ] * x[ k ]; // accumulate dot product into the residual
 		}
-
 		p->s += p->r[i] * p->r[i]; // accumulate sum-of-squares
-
 	}
+#endif
+
 	p->s /= 2.0; // absorb typical factor-of-two normalization in OLS
+	
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -200,6 +198,17 @@ double non_distributed_objective( const gsl_vector * x , void * params )
 	// compute the residuals from the data and coefficients
 	f = 0.0;
 
+#ifdef _GSLREGRESS_VECTOR
+#pragma vector always
+	for( i = 0 ; i < p->Nobsv ; i++ ) { 
+		residuals[i] = x->data[ x->stride * p->Nfeat ] - (p->data)[ i * (p->Nvars) + p->Nfeat ]; 
+#pragma vector always
+		for( k = 0 ; k < p->Nfeat ; k++ ) { 
+			residuals[i] += (p->data)[ i*(p->Nvars) + k ] * x->data[ x->stride * k ];
+		}
+		f += residuals[i] * residuals[i]; // accumulate sum-of-squares
+	}
+#else
 	for( i = 0 ; i < p->Nobsv ; i++ ) { 
 		// intialize with the constant minus observation value
 		residuals[ i ] = gsl_vector_get( x , p->Nfeat ) - (p->data)[ i * (p->Nvars) + p->Nfeat ]; 
@@ -208,7 +217,10 @@ double non_distributed_objective( const gsl_vector * x , void * params )
 		}
 		f += residuals[i] * residuals[i]; // accumulate sum-of-squares
 	}
+#endif
+
 	f /= 2.0 * ((double)(p->Nobsv)) ; // absorb typical factor-of-two normalization in OLS
+	
 	return f;
 }
 
