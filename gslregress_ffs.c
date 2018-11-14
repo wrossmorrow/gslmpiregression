@@ -307,7 +307,7 @@ void optimizer_process( int P , int B , int R , int F , char * prefix , const do
 	FILE * fp;
 	char filename[1024];
 
-	int status , iter = 0;
+	int i , status , iter = 0;
 	double size;
 
 	// initial barrier, basically separating the data simulation from the solve attempt
@@ -466,7 +466,7 @@ void worker_process( int p , char * prefix , gls_ols_params * params )
 
 #ifdef _GSLREGRESS_VERBOSE
 		printf( "%0.6f: process %i evaluating at %0.6f" , MPI_Wtime()-start , p , params->x[0] );
-		for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.6f" , params.x[i] ); }
+		for( i = 1 ; i < params->Nvars ; i++ ) { printf( " , %0.6f" , params->x[i] ); }
 		printf( "\n" );
 #endif
 
