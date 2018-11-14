@@ -419,8 +419,9 @@ int main( int argc , char * argv[] )
 		int offset = 0;
 		for( i = 0 ; i < P ; i++ ) {
 			sprintf( filename , "%s_%i.dat" , filename_prefix , i );
+			printf( "write to %s\n" , filename );
 			fp = fopen( filename , "wb" );
-			count  = ( B + ( i < R ? 1 : 0 ) ) * ( K + 1 );
+			count = ( B + ( i < R ? 1 : 0 ) ) * ( K + 1 );
 			fwrite( params.data + offset , sizeof( double ) , count , fp );
 			fclose( fp );
 			offset += count;
