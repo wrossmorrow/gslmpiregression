@@ -302,8 +302,9 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void optimizer_process( int P , int B , int R , int F , const double * x0 , gls_ols_params * params )
+void optimizer_process( int P , int B , int R , int F , char * prefix , const double * x0 , gls_ols_params * params )
 {
+	FILE * fp;
 
 	// initial barrier, basically separating the data simulation from the solve attempt
 	MPI_Barrier( MPI_COMM_WORLD );
@@ -315,9 +316,9 @@ void optimizer_process( int P , int B , int R , int F , const double * x0 , gls_
 #endif
 
 	// create process-specific filename, open the file, and read the data
-	sprintf( filename , "%s_%i.dat" , filename_prefix , p );
+	sprintf( filename , "%s_%i.dat" , prefix , p );
 	fp = fopen( filename , "rb" );
-	fread( (void*)(params.data) , sizeof( double ) , params.Ncols * params.Nvars , fp );
+	fread( (void*)(params->data) , sizeof( double ) , params->Ncols * params->Nvars , fp );
 	fclose( fp );
 
 	// setup GSL optimizer
@@ -328,21 +329,21 @@ void optimizer_process( int P , int B , int R , int F , const double * x0 , gls_
 
 	// minimizer object
 	const gsl_multimin_fminimizer_type * T = gsl_multimin_fminimizer_nmsimplex2;
-	gsl_multimin_fminimizer * s = gsl_multimin_fminimizer_alloc( T , params.Nvars );
+	gsl_multimin_fminimizer * s = gsl_multimin_fminimizer_alloc( T , params->Nvars );
 
 	// evaluation function
 	gsl_multimin_function sos;
-	sos.n = params.Nvars; // features and constant
+	sos.n = params->Nvars; // features and constant
 	sos.f = &distributed_objective; // defined elsewhere
 	sos.params = (void*)(&params); // we'll pass the data object, allocated here, to objective evaluations
 
 	// step size
-	gsl_vector * ss = gsl_vector_alloc( params.Nvars );
+	gsl_vector * ss = gsl_vector_alloc( params->Nvars );
 	gsl_vector_set_all( ss , 1.0 );
 
 	// initial point (random guess, but the same as possibly used above)
-	gsl_vector * x = gsl_vector_alloc( params.Nvars );
-	for( i = 0 ; i < params.Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
+	gsl_vector * x = gsl_vector_alloc( params->Nvars );
+	for( i = 0 ; i < params->Nvars ; i++ ) { gsl_vector_set( x , i , x0[i] ); }
 
 #ifdef _GSLREGRESS_VERBOSE
 	printf( "%0.6f: optimizer process: registering problem\n" , MPI_Wtime()-start );
@@ -418,8 +419,11 @@ void optimizer_process( int P , int B , int R , int F , const double * x0 , gls_
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void worker_process( int p , gls_ols_params * params )
+void worker_process( int p , char * prefix , gls_ols_params * params )
 {
+	FILE * fp;
+	char filename[1024];
+
 	// initial barrier
 	MPI_Barrier( MPI_COMM_WORLD );
 
@@ -428,7 +432,7 @@ void worker_process( int p , gls_ols_params * params )
 #endif
 
 	// create process-specific filename, open the file, and read the data
-	sprintf( filename , "%s_%i.dat" , filename_prefix , p );
+	sprintf( filename , "%s_%i.dat" , prefix , p );
 	fp = fopen( filename , "rb" );
 	fread( (void*)(params->data) , sizeof( double ) , params->Ncols * params->Nvars , fp );
 	fclose( fp );
@@ -618,12 +622,12 @@ int main( int argc , char * argv[] )
 		// do a distributed optimization
 		method_start = MPI_Wtime();
 		printf( "%0.6f: Distributed GSL Multimin Estimation... \n" , now() );
-		optimizer_process( P , B , R , K+1 , x0 , &params );
+		optimizer_process( P , B , R , K+1 , filename_prefix , x0 , &params );
 		printf( "%0.6f:   took %0.6fs \n" , now() , MPI_Wtime() - method_start );
 
 		free( x0 );
 
-	} else { worker_process( p , &params ); }
+	} else { worker_process( p , filename_prefix , &params ); }
 
 	// cleanup local stuff
 	free( params.data );
