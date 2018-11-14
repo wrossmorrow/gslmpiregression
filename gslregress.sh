@@ -19,4 +19,4 @@ icc ${BASE}.c -o bin/${BASE} ${CFLAGS} ${GSL_LIBS} ${GSL_INCL} ${MPI_INCL} ${MPI
 if [[ $? -ne 0 ]] ; then exit 1 ; fi
 
 LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GSL_SHARED_LIB} ; export LD_LIBRARY_PATH
-mpirun -np 4 bin/gslregress 1000 5
+mpirun -np 4 bin/${BASE} 1000 5
