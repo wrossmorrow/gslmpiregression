@@ -305,6 +305,7 @@ void gsl_minimize( gls_ols_params * params , const double * x0 )
 void optimizer_process( int P , int B , int R , int F , char * prefix , const double * x0 , gls_ols_params * params )
 {
 	FILE * fp;
+	char filename[1024];
 
 	// initial barrier, basically separating the data simulation from the solve attempt
 	MPI_Barrier( MPI_COMM_WORLD );
