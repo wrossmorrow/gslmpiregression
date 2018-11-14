@@ -341,7 +341,7 @@ void optimizer_process( int P , int B , int R , int F , char * prefix , const do
 	gsl_multimin_function sos;
 	sos.n = params->Nvars; // features and constant
 	sos.f = &distributed_objective; // defined elsewhere
-	sos.params = (void*)(&params); // we'll pass the data object, allocated here, to objective evaluations
+	sos.params = (void*)(params); // we'll pass the data object, allocated here, to objective evaluations
 
 	// step size
 	gsl_vector * ss = gsl_vector_alloc( params->Nvars );
