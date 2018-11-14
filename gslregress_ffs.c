@@ -403,19 +403,6 @@ int main( int argc , char * argv[] )
 			params.data[ n * params.Nvars + K ] += 2.0 * urand() - 1.0; // plus error
 		}
 
-		// _write_ data for each process out to a file prefixed by CLI argument
-		int count = 0;
-		int offset = 0;
-		for( r = 0 ; r < P ; r++ ) {
-			sprintf( filename , "%s_%i.dat" , filename_prefix , r );
-			fp = fopen( filename , "wb" );
-			count  = B + ( i < R ? 1 : 0 );
-			count *= K+1;
-			fwrite( params.data + offset , sizeof( double ) , count , fp );
-			fclose( fp );
-			offset += count;
-		}
-
 #ifdef _GSLREGRESS_VERBOSE
 		printf( "%0.6f: all data: \n" , MPI_Wtime()-start );
 		for( n = 0 ; n < N ; n++ ) {
@@ -425,6 +412,22 @@ int main( int argc , char * argv[] )
 			}
 			printf( "\n" );
 		}
+#endif
+
+		// _write_ data for each process out to a file prefixed by CLI argument
+		int count = 0;
+		int offset = 0;
+		for( r = 0 ; r < P ; r++ ) {
+			sprintf( filename , "%s_%i.dat" , filename_prefix , r );
+			fp = fopen( filename , "wb" );
+			count  = ( B + ( i < R ? 1 : 0 ) ) * ( K + 1 );
+			fwrite( params.data + offset , sizeof( double ) , count , fp );
+			fclose( fp );
+			offset += count;
+		}
+
+#ifdef _GSLREGRESS_VERBOSE
+		printf( "%0.6f: wrote data\n" , MPI_Wtime()-start );
 #endif
 
 		// initial condition
