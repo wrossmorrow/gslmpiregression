@@ -24,8 +24,8 @@ GSL_SHARED_LIB=\"/share/software/user/open/gsl/2.3/lib\"
 GSL_LIBS=\"-L\${GSL_SHARED_LIB} -lgsl -lgslcblas -lm\"
 GSL_INCL=\"-I/share/software/user/open/gsl/2.3/include\"
 
-MPI_INCL=$( mpicc -showme:compile )
-MPI_LIBS=$( mpicc -showme:link )
+MPI_INCL=\$( mpicc -showme:compile )
+MPI_LIBS=\$( mpicc -showme:link )
 
 icc ${BASE}.c -o bin/${BASE} \${CFLAGS} \${MPI_INCL} \${GSL_INCL} \${MPI_LIBS} \${GSL_LIBS}
 
