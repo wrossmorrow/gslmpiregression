@@ -588,7 +588,6 @@ int main( int argc , char * argv[] )
 		int count = 0;
 		for( r = 0 ; r < P ; r++ ) {
 			sprintf( filename , "%s_%i.dat" , filename_prefix , r );
-			printf( "write to %s\n" , filename );
 			fp = fopen( filename , "wb" );
 			count = ( B + ( r < R ? 1 : 0 ) );
 			for( n = 0 ; n < count ; n++ ) {
