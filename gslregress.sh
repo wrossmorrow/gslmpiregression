@@ -20,8 +20,8 @@ if [[ $? -ne 0 ]] ; then exit 1 ; fi
 
 LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GSL_SHARED_LIB} ; export LD_LIBRARY_PATH
 if [[ $# -ge 2 ]] ; then 
-	echo "mpirun -np 4 bin/${BASE} 1000 5 (${@:2})"
-	mpirun -np 4 bin/${BASE} 1000 5 (${@:2})
+	echo "mpirun -np 4 bin/${BASE} 1000 5 ${@:2}"
+	mpirun -np 4 bin/${BASE} 1000 5 ${@:2}
 else 
 	mpirun -np 4 bin/${BASE} 1000 5
 fi
