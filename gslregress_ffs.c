@@ -307,6 +307,9 @@ void optimizer_process( int P , int B , int R , int F , char * prefix , const do
 	FILE * fp;
 	char filename[1024];
 
+	int status , iter = 0;
+	double size;
+
 	// initial barrier, basically separating the data simulation from the solve attempt
 	MPI_Barrier( MPI_COMM_WORLD );
 
@@ -317,7 +320,7 @@ void optimizer_process( int P , int B , int R , int F , char * prefix , const do
 #endif
 
 	// create process-specific filename, open the file, and read the data
-	sprintf( filename , "%s_%i.dat" , prefix , p );
+	sprintf( filename , "%s_%i.dat" , prefix , 0 );
 	fp = fopen( filename , "rb" );
 	fread( (void*)(params->data) , sizeof( double ) , params->Ncols * params->Nvars , fp );
 	fclose( fp );
@@ -367,8 +370,6 @@ void optimizer_process( int P , int B , int R , int F , char * prefix , const do
 
 	// iterations
 	status = GSL_CONTINUE;
-	int iter = 0; 
-	double size;
 	do {
 
 		// iterate will call the distributed objective
