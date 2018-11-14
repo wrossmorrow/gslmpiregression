@@ -425,6 +425,7 @@ void worker_process( int p , char * prefix , gls_ols_params * params )
 {
 	FILE * fp;
 	char filename[1024];
+	int i , status;
 
 	// initial barrier
 	MPI_Barrier( MPI_COMM_WORLD );
