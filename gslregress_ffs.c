@@ -36,7 +36,7 @@
 #include <gsl/gsl_multimin.h>
 
 // comment out to suppress (most) messages, including data print
-// #define _GSLREGRESS_VERBOSE
+#define _GSLREGRESS_VERBOSE
 
 // optimization tolerance
 #define GSLREGRESS_OPT_TOL 1.0e-4
@@ -367,6 +367,7 @@ int main( int argc , char * argv[] )
 	printf( "%0.6f: process %i: number of variables... %i\n" , MPI_Wtime()-start , p , params.Nvars );
 	printf( "%0.6f: process %i: number of features.... %i\n" , MPI_Wtime()-start , p , params.Nfeat );
 	printf( "%0.6f: process %i: number of columns..... %i\n" , MPI_Wtime()-start , p , params.Ncols );
+	printf( "%0.6f: process %i: filename prefix....... %s\n" , MPI_Wtime()-start , p , filename_prefix );
 #endif
 
 	// variables
